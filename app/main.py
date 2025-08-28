@@ -80,27 +80,6 @@ def _generate_unique_id() -> str:
     """Generate a unique ID for file storage"""
     return str(uuid.uuid4())
 
-def _save_file_to_storage(file_path: str, original_filename: str) -> tuple[str, str]:
-    """Save a file to storage and return the unique ID and storage path"""
-    unique_id = _generate_unique_id()
-    file_extension = pathlib.Path(original_filename).suffix
-    storage_filename = f"{unique_id}{file_extension}"
-    storage_path = os.path.join(STORAGE_DIR, storage_filename)
-    
-    # Copy file to storage
-    shutil.copy2(file_path, storage_path)
-    
-    # Store metadata
-    file_metadata[unique_id] = {
-        "filename": original_filename,
-        "storage_path": storage_path,
-        "created_at": datetime.now(),
-        "expires_at": datetime.now() + timedelta(hours=FILE_EXPIRY_HOURS),
-        "size": os.path.getsize(storage_path)
-    }
-    
-    return unique_id, storage_path
-
 def _cleanup_expired_files():
     """Remove expired files from storage"""
     current_time = datetime.now()
@@ -200,8 +179,23 @@ async def render(
         print(f"DEBUG: PDF content loaded into memory: {len(pdf_content)} bytes")
         
         # Save file to storage
-        original_filename = pathlib.Path(entry).stem + ".pdf"
-        file_id, storage_path = _save_file_to_storage(pdf_path, original_filename)
+        # Generate a descriptive filename using the file ID
+        file_id = _generate_unique_id()
+        file_extension = ".pdf"
+        descriptive_filename = f"latex-{file_id}{file_extension}"
+        storage_path = os.path.join(STORAGE_DIR, f"{file_id}{file_extension}")
+        
+        # Copy file to storage
+        shutil.copy2(pdf_path, storage_path)
+        
+        # Store metadata
+        file_metadata[file_id] = {
+            "filename": descriptive_filename,
+            "storage_path": storage_path,
+            "created_at": datetime.now(),
+            "expires_at": datetime.now() + timedelta(hours=FILE_EXPIRY_HOURS),
+            "size": os.path.getsize(storage_path)
+        }
         
         # Clean up the working directory
         print(f"DEBUG: Cleaning up working directory: {workdir}")
@@ -213,7 +207,7 @@ async def render(
             "success": True,
             "message": "LaTeX compilation successful",
             "file_id": file_id,
-            "filename": original_filename,
+            "filename": descriptive_filename,
             "download_url": download_url,
             "expires_at": file_metadata[file_id]["expires_at"].isoformat(),
             "size_bytes": len(pdf_content)
@@ -268,6 +262,8 @@ async def list_files():
         files.append({
             "file_id": file_id,
             "filename": metadata["filename"],
+            "original_filename": metadata.get("original_filename", metadata["filename"]),
+            "project_name": metadata.get("project_name", "Unknown"),
             "created_at": metadata["created_at"].isoformat(),
             "expires_at": metadata["expires_at"].isoformat(),
             "size_bytes": metadata["size"],

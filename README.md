@@ -66,7 +66,7 @@ Instead of returning the PDF directly, the service now returns file storage info
   "success": true,
   "message": "LaTeX compilation successful",
   "file_id": "550e8400-e29b-41d4-a716-446655440000",
-  "filename": "main.pdf",
+  "filename": "latex-550e8400-e29b-41d4-a716-446655440000.pdf",
   "download_url": "/files/550e8400-e29b-41d4-a716-446655440000",
   "expires_at": "2025-08-30T14:06:09.123456",
   "size_bytes": 96082
@@ -78,11 +78,11 @@ Instead of returning the PDF directly, the service now returns file storage info
 ```bash
 # Download using the unique file ID
 curl "http://localhost:8000/files/550e8400-e29b-41d4-a716-446655440000" \
-  --output main.pdf
+  --output latex-550e8400-e29b-41d4-a716-446655440000.pdf
 
 # Or use the full download URL
 curl "http://localhost:8000/files/550e8400-e29b-41d4-a716-446655440000" \
-  --output main.pdf
+  --output latex-550e8400-e29b-41d4-a716-446655440000.pdf
 ```
 
 ### List All Stored Files

@@ -82,7 +82,7 @@ cd tests
   "success": true,
   "message": "LaTeX compilation successful",
   "file_id": "550e8400-e29b-41d4-a716-446655440000",
-  "filename": "main.pdf",
+  "filename": "latex-550e8400-e29b-41d4-a716-446655440000.pdf",
   "download_url": "/files/550e8400-e29b-41d4-a716-446655440000",
   "expires_at": "2025-08-30T14:06:09.123456",
   "size_bytes": 96082
