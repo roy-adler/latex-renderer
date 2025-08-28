@@ -52,10 +52,9 @@ def _compile_latexmk(entry: str, allow_shell_escape: bool, runs: int) -> tuple[s
     # latexmk will call pdflatex/xelatex/lualatex/bibtex/biber as needed
     # default to pdf mode; nonstop to produce logs even on errors
     shell = "-shell-escape" if allow_shell_escape else "-no-shell-escape"
-    cmd = ["latexmk", "-pdf", "-interaction=nonstopmode", shell, "-halt-on-error", "-file-line-error", "-silent", "-pdfxe"]
-    # Note: remove "-pdfxe" if you don't want XeLaTeX auto preference
-    cmd += ["-pdflua", "-use-make"]  # harmless if engine not selected
-    cmd += ["-f", "-g", "-pdflatex=pdflatex %O %S"]
+    cmd = ["latexmk", "-pdf", "-interaction=nonstopmode", shell, "-halt-on-error", "-file-line-error", "-silent", "-f"]
+    # Force pdflatex instead of XeLaTeX/LuaLaTeX
+    cmd += ["-pdflatex=pdflatex %O %S"]
     # Limit passes
     os.environ["LATEXMK_MAX_REPEAT"] = str(max(1, min(10, runs)))
     
@@ -63,19 +62,56 @@ def _compile_latexmk(entry: str, allow_shell_escape: bool, runs: int) -> tuple[s
     print(f"DEBUG: Working directory: {str(pathlib.Path(entry).parent)}")
     print(f"DEBUG: Entry point: {entry}")
     
-    result = _run(cmd + [pathlib.Path(entry).name], cwd=str(pathlib.Path(entry).parent))
+    # First attempt: try normal compilation
+    result = subprocess.run(cmd + [pathlib.Path(entry).name], cwd=pathlib.Path(entry).parent, capture_output=True, text=True)
     
-    print(f"DEBUG: Command return code: {result.returncode}")
-    print(f"DEBUG: Command stdout: {result.stdout[:500] if result.stdout else 'None'}")
-    print(f"DEBUG: Command stderr: {result.stderr[:500] if result.stderr else 'None'}")
+    # If compilation fails, try to install missing packages with tlmgr
+    if result.returncode != 0:
+        print(f"DEBUG: First compilation failed with return code {result.returncode}")
+        print(f"DEBUG: Attempting to install missing packages with tlmgr...")
+        
+        # Try to use tlmgr to install missing packages
+        try:
+            # Create user texmf directory
+            user_texmf = pathlib.Path.home() / "texmf"
+            user_texmf.mkdir(exist_ok=True)
+            
+            # Try to install common missing packages
+            common_packages = ["tracklang", "glossaries", "biblatex", "biber"]
+            for package in common_packages:
+                try:
+                    tlmgr_cmd = ["tlmgr", "--usermode", "install", package]
+                    tlmgr_result = subprocess.run(tlmgr_cmd, cwd=pathlib.Path(entry).parent, 
+                                                capture_output=True, text=True, timeout=60)
+                    if tlmgr_result.returncode == 0:
+                        print(f"DEBUG: Successfully installed {package}")
+                    else:
+                        print(f"DEBUG: Failed to install {package}: {tlmgr_result.stderr}")
+                except Exception as e:
+                    print(f"DEBUG: Error installing {package}: {e}")
+            
+            # Try compilation again after installing packages
+            print(f"DEBUG: Retrying compilation after package installation...")
+            result = subprocess.run(cmd + [pathlib.Path(entry).name], cwd=pathlib.Path(entry).parent, capture_output=True, text=True)
+            
+        except Exception as e:
+            print(f"DEBUG: Package installation failed: {e}")
     
-    log = (result.stdout or "") + "\n" + (result.stderr or "")
-    pdf = str(pathlib.Path(entry).with_suffix(".pdf"))
+    # Read log file for detailed error information
+    log_file = pathlib.Path(entry).with_suffix('.log')
+    log_content = ""
+    if log_file.exists():
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                log_content = f.read()
+        except Exception as e:
+            log_content = f"Error reading log file: {e}"
     
-    print(f"DEBUG: Expected PDF path: {pdf}")
-    print(f"DEBUG: PDF file exists: {pathlib.Path(pdf).exists()}")
+    # Return the expected values: pdf_path and log
+    pdf_path = str(pathlib.Path(entry).with_suffix('.pdf'))
+    log = (result.stdout or "") + "\n" + (result.stderr or "") + "\n\n=== LaTeX Log File ===\n" + log_content
     
-    return pdf, log
+    return pdf_path, log
 
 def _generate_unique_id() -> str:
     """Generate a unique ID for file storage"""

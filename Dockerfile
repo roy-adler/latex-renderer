@@ -1,15 +1,13 @@
 # ---------- LaTeX rendering service with LaTeXmk ----------
-FROM debian:bookworm-slim
+FROM ubuntu:22.04
 
-ARG DEBIAN_FRONTEND=noninteractive
+# Install TeX Live + latexmk with comprehensive packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl python3 python3-pip python3-venv unzip xz-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install TeX Live + latexmk
-RUN apt-get update && apt-get install -y --no-install-recommends \
     latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
-    biber make ghostscript \
+    texlive-lang-german texlive-lang-english texlive-science texlive-publishers \
+    texlive-lang-other texlive-lang-european texlive-extra-utils texlive-bibtex-extra \
+    texlive-full biber make ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
 # App
@@ -19,6 +17,8 @@ COPY requirements.txt /app/
 # Create virtual environment and install dependencies
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app /app
