@@ -64,6 +64,24 @@ def _compile_latexmk(entry: str, allow_shell_escape: bool, runs: int) -> tuple[s
     pdf = str(pathlib.Path(entry).with_suffix(".pdf"))
     return pdf, log
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for container monitoring"""
+    return {"status": "healthy", "service": "latex-renderer"}
+
+@app.get("/")
+async def root():
+    """Root endpoint with API information"""
+    return {
+        "service": "LaTeX Render API",
+        "version": "1.0.0",
+        "endpoints": {
+            "render": "/render - POST endpoint for rendering LaTeX projects",
+            "health": "/health - Health check endpoint"
+        },
+        "supported_engines": ["tectonic", "latexmk"]
+    }
+
 @app.post("/render")
 async def render(
     project: UploadFile = File(...),

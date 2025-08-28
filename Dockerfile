@@ -6,11 +6,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl python3 python3-pip unzip xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Tectonic
+# Install Tectonic - try multiple approaches
 RUN curl -L https://github.com/tectonic-typesetting/tectonic/releases/latest/download/tectonic-x86_64-unknown-linux-gnu.tar.xz \
-  | tar -xJ -C /usr/local/bin --strip-components=1 ./tectonic
+    -o /tmp/tectonic.tar.xz \
+    && tar -xf /tmp/tectonic.tar.xz -C /tmp \
+    && find /tmp -name "tectonic" -executable -exec mv {} /usr/local/bin/ \; \
+    && rm -rf /tmp/* \
+    || echo "Tectonic installation failed, will use TeX Live fallback"
 
-# (Optional) Install a minimal TeX Live + latexmk for fallback engine
+# Install TeX Live + latexmk for fallback engine
 RUN apt-get update && apt-get install -y --no-install-recommends \
     latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
     biber make ghostscript \
@@ -28,4 +32,3 @@ USER runner
 
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-    
