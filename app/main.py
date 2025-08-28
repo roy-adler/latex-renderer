@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import threading
 
+# FastAPI app
 app = FastAPI(title="LaTeX Render API")
 
 # File storage configuration
