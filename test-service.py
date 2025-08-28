@@ -46,14 +46,15 @@ def test_service():
     print(f"✅ Created test ZIP: {zip_path}")
     
     try:
-        # Test rendering
-        print("\n🔄 Testing LaTeX rendering...")
+        # Test rendering with latexmk since tectonic failed to install
+        print("\n🔄 Testing LaTeX rendering with latexmk...")
         
         with open(zip_path, 'rb') as f:
             files = {'project': ('test-project.zip', f, 'application/zip')}
             data = {
-                'engine': 'tectonic',
-                'allow_shell_escape': 'false'
+                'engine': 'latexmk',
+                'allow_shell_escape': 'false',
+                'runs': '3'
             }
             
             response = requests.post(
