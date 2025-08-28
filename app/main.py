@@ -1,8 +1,22 @@
-import io, os, shutil, tempfile, zipfile, subprocess, pathlib, json
+import io, os, shutil, tempfile, zipfile, subprocess, pathlib, json, uuid, time
+from datetime import datetime, timedelta
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+import threading
 
 app = FastAPI(title="LaTeX Render API")
+
+# File storage configuration
+STORAGE_DIR = "/tmp/latex_storage"
+STORAGE_URL = "/files"
+FILE_EXPIRY_HOURS = 48
+
+# Ensure storage directory exists
+os.makedirs(STORAGE_DIR, exist_ok=True)
+
+# In-memory storage for file metadata (in production, use a database)
+file_metadata = {}
 
 def _extract_zip_to_tmp(zip_bytes: bytes) -> str:
     workdir = tempfile.mkdtemp(prefix="latexapi_")
@@ -62,6 +76,63 @@ def _compile_latexmk(entry: str, allow_shell_escape: bool, runs: int) -> tuple[s
     
     return pdf, log
 
+def _generate_unique_id() -> str:
+    """Generate a unique ID for file storage"""
+    return str(uuid.uuid4())
+
+def _save_file_to_storage(file_path: str, original_filename: str) -> tuple[str, str]:
+    """Save a file to storage and return the unique ID and storage path"""
+    unique_id = _generate_unique_id()
+    file_extension = pathlib.Path(original_filename).suffix
+    storage_filename = f"{unique_id}{file_extension}"
+    storage_path = os.path.join(STORAGE_DIR, storage_filename)
+    
+    # Copy file to storage
+    shutil.copy2(file_path, storage_path)
+    
+    # Store metadata
+    file_metadata[unique_id] = {
+        "filename": original_filename,
+        "storage_path": storage_path,
+        "created_at": datetime.now(),
+        "expires_at": datetime.now() + timedelta(hours=FILE_EXPIRY_HOURS),
+        "size": os.path.getsize(storage_path)
+    }
+    
+    return unique_id, storage_path
+
+def _cleanup_expired_files():
+    """Remove expired files from storage"""
+    current_time = datetime.now()
+    expired_ids = []
+    
+    for file_id, metadata in file_metadata.items():
+        if current_time > metadata["expires_at"]:
+            expired_ids.append(file_id)
+    
+    for file_id in expired_ids:
+        try:
+            metadata = file_metadata[file_id]
+            if os.path.exists(metadata["storage_path"]):
+                os.remove(metadata["storage_path"])
+            del file_metadata[file_id]
+            print(f"Cleaned up expired file: {file_id}")
+        except Exception as e:
+            print(f"Error cleaning up file {file_id}: {e}")
+
+def _schedule_cleanup():
+    """Schedule periodic cleanup of expired files"""
+    def run_cleanup():
+        while True:
+            _cleanup_expired_files()
+            time.sleep(3600)  # Run every hour
+    
+    cleanup_thread = threading.Thread(target=run_cleanup, daemon=True)
+    cleanup_thread.start()
+
+# Start cleanup scheduler
+_schedule_cleanup()
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for container monitoring"""
@@ -75,9 +146,11 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "render": "/render - POST endpoint for rendering LaTeX projects",
+            "files": f"{STORAGE_URL}/{{file_id}} - GET endpoint for downloading generated files",
             "health": "/health - Health check endpoint"
         },
-        "supported_engines": ["latexmk"]
+        "supported_engines": ["latexmk"],
+        "file_expiry": f"{FILE_EXPIRY_HOURS} hours"
     }
 
 @app.post("/render")
@@ -126,19 +199,86 @@ async def render(
         
         print(f"DEBUG: PDF content loaded into memory: {len(pdf_content)} bytes")
         
+        # Save file to storage
+        original_filename = pathlib.Path(entry).stem + ".pdf"
+        file_id, storage_path = _save_file_to_storage(pdf_path, original_filename)
+        
         # Clean up the working directory
         print(f"DEBUG: Cleaning up working directory: {workdir}")
         shutil.rmtree(workdir, ignore_errors=True)
         
-        # Return the PDF content directly
-        return StreamingResponse(
-            iter([pdf_content]),
-            media_type="application/pdf",
-            headers={"Content-Disposition": 'inline; filename="output.pdf"'},
-        )
+        # Return file information with download link
+        download_url = f"{STORAGE_URL}/{file_id}"
+        return {
+            "success": True,
+            "message": "LaTeX compilation successful",
+            "file_id": file_id,
+            "filename": original_filename,
+            "download_url": download_url,
+            "expires_at": file_metadata[file_id]["expires_at"].isoformat(),
+            "size_bytes": len(pdf_content)
+        }
         
     except Exception as e:
         print(f"DEBUG: Error during processing: {e}")
         # Clean up on error
         shutil.rmtree(workdir, ignore_errors=True)
         raise
+
+@app.get(f"{STORAGE_URL}/{{file_id}}")
+async def download_file(file_id: str):
+    """Download a file by its unique ID"""
+    if file_id not in file_metadata:
+        raise HTTPException(404, "File not found or expired")
+    
+    metadata = file_metadata[file_id]
+    
+    # Check if file has expired
+    if datetime.now() > metadata["expires_at"]:
+        # Clean up expired file
+        try:
+            if os.path.exists(metadata["storage_path"]):
+                os.remove(metadata["storage_path"])
+            del file_metadata[file_id]
+        except Exception as e:
+            print(f"Error cleaning up expired file {file_id}: {e}")
+        
+        raise HTTPException(410, "File has expired and been removed")
+    
+    # Check if file still exists on disk
+    if not os.path.exists(metadata["storage_path"]):
+        del file_metadata[file_id]
+        raise HTTPException(404, "File not found on disk")
+    
+    # Return file for download
+    return StreamingResponse(
+        open(metadata["storage_path"], "rb"),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{metadata["filename"]}"',
+            "Content-Length": str(metadata["size"])
+        }
+    )
+
+@app.get("/files")
+async def list_files():
+    """List all available files with their metadata"""
+    files = []
+    for file_id, metadata in file_metadata.items():
+        files.append({
+            "file_id": file_id,
+            "filename": metadata["filename"],
+            "created_at": metadata["created_at"].isoformat(),
+            "expires_at": metadata["expires_at"].isoformat(),
+            "size_bytes": metadata["size"],
+            "download_url": f"{STORAGE_URL}/{file_id}"
+        })
+    
+    return {
+        "files": files,
+        "total_files": len(files),
+        "storage_directory": STORAGE_DIR
+    }
+
+# Mount static files for direct access (optional)
+app.mount(STORAGE_URL, StaticFiles(directory=STORAGE_DIR), name="files")
