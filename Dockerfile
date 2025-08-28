@@ -3,7 +3,7 @@ FROM debian:bookworm-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl python3 python3-pip unzip xz-utils \
+    ca-certificates curl python3 python3-pip python3-venv unzip xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Tectonic - try multiple approaches
@@ -24,11 +24,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY app /app
 COPY requirements.txt /app/
-RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Create virtual environment and install dependencies
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Security: run as non-root
 RUN useradd -m runner
 USER runner
 
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/opt/venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
