@@ -1,7 +1,7 @@
 import io, os, shutil, tempfile, zipfile, subprocess, pathlib, json, uuid, time
 from datetime import datetime, timedelta
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import threading
 
@@ -156,18 +156,27 @@ async def health_check():
 
 @app.get("/")
 async def root():
-    """Root endpoint with API information"""
-    return {
-        "service": "LaTeX Render API",
-        "version": "1.0.0",
-        "endpoints": {
-            "render": "/render - POST endpoint for rendering LaTeX projects",
-            "files": f"{STORAGE_URL}/{{file_id}} - GET endpoint for downloading generated files",
-            "health": "/health - Health check endpoint"
-        },
-        "supported_engines": ["latexmk"],
-        "file_expiry": f"{FILE_EXPIRY_HOURS} hours"
-    }
+    """Serve the web interface"""
+    try:
+        # Get the directory where this script is located
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        html_path = os.path.join(script_dir, "static", "index.html")
+        with open(html_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    except FileNotFoundError:
+        # Fallback to API info if HTML file not found
+        return {
+            "service": "LaTeX Render API",
+            "version": "1.0.0",
+            "endpoints": {
+                "render": "/render - POST endpoint for rendering LaTeX projects",
+                "files": f"{STORAGE_URL}/{{file_id}} - GET endpoint for downloading generated files",
+                "health": "/health - Health check endpoint"
+            },
+            "supported_engines": ["latexmk"],
+            "file_expiry": f"{FILE_EXPIRY_HOURS} hours"
+        }
 
 @app.post("/render")
 async def render(
@@ -281,13 +290,15 @@ async def download_file(file_id: str):
         del file_metadata[file_id]
         raise HTTPException(404, "File not found on disk")
     
-    # Return file for download
+    # Return file for inline display (not download)
     return StreamingResponse(
         open(metadata["storage_path"], "rb"),
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{metadata["filename"]}"',
-            "Content-Length": str(metadata["size"])
+            "Content-Disposition": f'inline; filename="{metadata["filename"]}"',
+            "Content-Length": str(metadata["size"]),
+            "Cache-Control": "public, max-age=3600",
+            "X-Content-Type-Options": "nosniff"
         }
     )
 
@@ -313,5 +324,25 @@ async def list_files():
         "storage_directory": STORAGE_DIR
     }
 
-# Mount static files for direct access (optional)
-app.mount(STORAGE_URL, StaticFiles(directory=STORAGE_DIR), name="files")
+# Note: Files are served through the custom endpoint above, not through static file mounting
+# This allows us to control Content-Disposition headers for inline PDF display
+
+# Mount static files for the web interface
+# Use absolute path for Docker compatibility
+static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+@app.get("/api")
+async def api_info():
+    """API information endpoint"""
+    return {
+        "service": "LaTeX Render API",
+        "version": "1.0.0",
+        "endpoints": {
+            "render": "/render - POST endpoint for rendering LaTeX projects",
+            "files": f"{STORAGE_URL}/{{file_id}} - GET endpoint for downloading generated files",
+            "health": "/health - Health check endpoint"
+        },
+        "supported_engines": ["latexmk"],
+        "file_expiry": f"{FILE_EXPIRY_HOURS} hours"
+    }

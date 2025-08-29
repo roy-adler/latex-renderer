@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX Renderer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            padding: 60px 20px;
+            margin: 30px 0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            pointer-events: auto;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background-color: #f8f9ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background-color: #f0f4ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .file-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            margin: 30px 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            display: none;
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .success-icon {
+            font-size: 2rem;
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+
+
+
+        .error {
+            background: #fff5f5;
+            border-left-color: #e53e3e;
+            color: #c53030;
+        }
+
+        .error-icon {
+            color: #e53e3e;
+        }
+
+        .file-info {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: left;
+        }
+
+        .file-info p {
+            margin: 5px 0;
+            color: #333;
+        }
+
+        .file-info strong {
+            color: #667eea;
+        }
+
+        .file-selected {
+            background: #e8f5e8;
+            border: 1px solid #28a745;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 15px;
+            color: #155724;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: block;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(40, 167, 69, 0.3);
+        }
+
+        .pdf-viewer {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .pdf-viewer h4 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .action-buttons .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">LaTeX Renderer</div>
+        <div class="subtitle">Upload your LaTeX project and get a compiled PDF</div>
+        <div class="info-box" style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center; color: #1565c0;">
+            <strong>💡 Tip:</strong> For full LaTeX compilation functionality, use the Docker container. Local testing may fail due to missing LaTeX tools.
+        </div>
+        
+        <div class="upload-area" id="uploadArea">
+            <input type="file" class="file-input" id="fileInput" accept=".zip" />
+            <div class="upload-icon">📁</div>
+            <div class="upload-text" id="uploadText">Drag & drop your ZIP file here</div>
+            <div class="upload-hint" id="uploadHint">or click to browse</div>
+            <div class="file-selected" id="fileSelected" style="display: none;">
+                <strong>File selected:</strong> <span id="selectedFileName"></span>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Compiling your LaTeX project...</div>
+            <div style="font-size: 0.9rem; color: #666; margin-top: 10px;">This may take a few moments</div>
+            <div class="compilation-steps" style="margin-top: 20px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;">
+                <div class="step" style="margin: 8px 0; padding: 8px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea;">
+                    <span class="step-icon">📦</span> Extracting ZIP file...
+                </div>
+                <div class="step" style="margin: 8px 0; padding: 8px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea;">
+                    <span class="step-icon">🔍</span> Detecting LaTeX entry point...
+                </div>
+                <div class="step" style="margin: 8px 0; padding: 8px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea;">
+                    <span class="step-icon">⚙️</span> Running latexmk compilation...
+                </div>
+                <div class="step" style="margin: 8px 0; padding: 8px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea;">
+                    <span class="step-icon">📄</span> Generating PDF...
+                </div>
+            </div>
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const fileSelected = document.getElementById('fileSelected');
+        const selectedFileName = document.getElementById('selectedFileName');
+        const uploadText = document.getElementById('uploadText');
+        const uploadHint = document.getElementById('uploadHint');
+
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // Click to upload - improved event handling
+        uploadArea.addEventListener('click', (e) => {
+            // Don't trigger if clicking on the file input itself
+            if (e.target !== fileInput) {
+                fileInput.click();
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            console.log('File selected:', e.target.files[0]?.name);
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+
+
+        function handleFile(file) {
+            console.log('Handling file:', file.name, 'Size:', file.size, 'Type:', file.type);
+            
+            if (!file.name.endsWith('.zip')) {
+                showError('Please select a ZIP file containing your LaTeX project.');
+                return;
+            }
+
+            // Show file selected indicator and start compilation immediately
+            selectedFileName.textContent = file.name;
+            fileSelected.style.display = 'block';
+            uploadText.textContent = 'File uploaded, starting compilation...';
+            uploadHint.textContent = 'Please wait while we compile your LaTeX project';
+
+            console.log('File validation passed, starting compilation immediately');
+            
+            // Start compilation immediately
+            uploadFile(file);
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('project', file);
+            formData.append('engine', 'latexmk');
+            formData.append('runs', '3');
+
+            // Show loading with compilation steps
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            
+            // Update upload area to show compilation in progress
+            uploadText.textContent = 'Compilation in progress...';
+            uploadHint.textContent = 'Please wait while we process your LaTeX project';
+            
+            // Reset file input for next upload
+            fileInput.value = '';
+            fileSelected.style.display = 'none';
+
+            try {
+                const response = await fetch('/render', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        showSuccess(data);
+                    } else {
+                        showError(data.error || 'Compilation failed. Please check your LaTeX code.');
+                    }
+                } else {
+                    // Handle HTTP error responses
+                    let errorMessage = 'Compilation failed';
+                    
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
+                    } catch (parseError) {
+                        // If we can't parse the error response, use the status text
+                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        
+                        // Provide specific guidance for common errors
+                        if (response.status === 500) {
+                            errorMessage += '. This usually means LaTeX tools are not available. Please use the Docker container for full functionality.';
+                        } else if (response.status === 400) {
+                            errorMessage += '. Please check your ZIP file contains a valid LaTeX project.';
+                        } else if (response.status === 422) {
+                            errorMessage += '. LaTeX compilation failed. Check your source code for errors.';
+                        }
+                    }
+                    
+                    showError(errorMessage);
+                }
+            } catch (error) {
+                console.error('Network or parsing error:', error);
+                showError('Network error occurred while processing your file. Please check your connection and try again.');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function showSuccess(data) {
+            result.className = 'result';
+            result.innerHTML = `
+                <div class="success-icon">✅</div>
+                <h3>Compilation Successful!</h3>
+                <div class="file-info">
+                    <p><strong>File ID:</strong> ${data.file_id}</p>
+                    <p><strong>Filename:</strong> ${data.filename}</p>
+                    <p><strong>Size:</strong> ${(data.size_bytes / 1024).toFixed(1)} KB</p>
+                    <p><strong>Expires:</strong> ${new Date(data.expires_at).toLocaleString()}</p>
+                </div>
+                <div class="pdf-viewer">
+                    <h4>📄 PDF Ready!</h4>
+                    <div style="text-align: center; padding: 40px 20px; background: #f8f9fa; border-radius: 12px; border: 2px dashed #dee2e6;">
+                        <div style="font-size: 4rem; margin-bottom: 20px;">📄</div>
+                        <h3 style="margin: 0 0 15px 0; color: #28a745;">Compilation Successful!</h3>
+                        <p style="margin: 0 0 25px 0; color: #666; font-size: 1.1rem;">
+                            Your LaTeX project has been compiled successfully.<br>
+                            Click the button below to view the PDF in your browser.
+                        </p>
+                        <button class="btn" onclick="window.open('${data.download_url}', '_blank')" style="font-size: 1.2rem; padding: 15px 30px; background: #28a745; border-color: #28a745;">
+                            🔗 Open PDF in Browser
+                        </button>
+                    </div>
+                </div>
+                <div class="action-buttons" style="margin-top: 20px; text-align: center;">
+                    <button class="btn" onclick="window.open('${data.download_url}', '_blank')" style="margin-right: 10px;">
+                        🔗 Open in New Tab
+                    </button>
+                    <button class="btn" onclick="resetInterface()">
+                        📁 Upload Another File
+                    </button>
+                </div>
+            `;
+            result.style.display = 'block';
+        }
+
+        function showError(message) {
+            result.className = 'result error';
+            result.innerHTML = `
+                <div class="error-icon">❌</div>
+                <h3>Error</h3>
+                <p>${message}</p>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 20px 0; text-align: left;">
+                    <h4 style="margin: 0 0 10px 0; color: #856404;">🔧 Troubleshooting Tips:</h4>
+                    <ul style="margin: 0; padding-left: 20px; color: #856404;">
+                        <li>Ensure your ZIP file contains a valid LaTeX project with a main .tex file</li>
+                        <li>For local testing: LaTeX tools may not be available - use Docker for full functionality</li>
+                        <li>Check that your LaTeX code compiles without errors</li>
+                        <li>Verify the ZIP file is not corrupted</li>
+                    </ul>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn" onclick="resetInterface()">
+                        📁 Try Another File
+                    </button>
+                </div>
+            `;
+            result.style.display = 'block';
+        }
+
+        function resetInterface() {
+            // Reset all interface elements
+            result.style.display = 'none';
+            loading.style.display = 'none';
+            fileSelected.style.display = 'none';
+            uploadText.textContent = 'Drag & drop your ZIP file here';
+            uploadHint.textContent = 'or click to browse';
+            
+            // Reset file input
+            fileInput.value = '';
+            
+            console.log('Interface reset for new upload');
+        }
+    </script>
+</body>
+</html>
