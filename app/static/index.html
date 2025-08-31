@@ -405,6 +405,13 @@
         }
 
         function showSuccess(data) {
+            // Hide loading screen when showing success
+            loading.style.display = 'none';
+            
+            // Reset upload area text back to original state
+            uploadText.textContent = 'Drag & drop your ZIP file here';
+            uploadHint.textContent = 'or click to browse';
+            
             result.className = 'result';
             result.innerHTML = `
                 <div class="success-icon">✅</div>
@@ -442,6 +449,13 @@
         }
 
         function showError(message) {
+            // Hide loading screen when showing error
+            loading.style.display = 'none';
+            
+            // Reset upload area text back to original state
+            uploadText.textContent = 'Drag & drop your ZIP file here';
+            uploadHint.textContent = 'or click to browse';
+            
             result.className = 'result error';
             result.innerHTML = `
                 <div class="error-icon">❌</div>
