@@ -302,6 +302,36 @@ async def download_file(file_id: str):
         }
     )
 
+@app.post("/render-source")
+async def render_source(
+    source: str = Form(...),
+    filename: str = Form("main.tex"),
+    allow_shell_escape: bool = Form(False),
+    runs: int = Form(3),
+):
+    """Compile raw LaTeX source text and return the PDF directly (used by Live Mode)."""
+    workdir = tempfile.mkdtemp(prefix="latexapi_live_")
+    entry = os.path.join(workdir, filename)
+    try:
+        with open(entry, "w", encoding="utf-8") as f:
+            f.write(source)
+        pdf_path, log = _compile_latexmk(entry, allow_shell_escape, runs)
+        if not pathlib.Path(pdf_path).exists():
+            return JSONResponse(
+                status_code=422,
+                content={"error": "Compilation failed", "log": log[-20000:]},
+            )
+        with open(pdf_path, "rb") as f:
+            pdf_content = f.read()
+        return StreamingResponse(
+            io.BytesIO(pdf_content),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="output.pdf"'},
+        )
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
 @app.get("/files")
 async def list_files():
     """List all available files with their metadata"""

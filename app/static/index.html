@@ -40,15 +40,54 @@
 
         .subtitle {
             color: #666;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
             font-size: 1.1rem;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-live {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-live:hover {
+            box-shadow: 0 10px 20px rgba(245, 87, 108, 0.3);
         }
 
         .upload-area {
             border: 3px dashed #ddd;
             border-radius: 15px;
             padding: 60px 20px;
-            margin: 30px 0;
+            margin: 0 0 30px 0;
             transition: all 0.3s ease;
             cursor: pointer;
             position: relative;
@@ -95,30 +134,6 @@
             pointer-events: none;
         }
 
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin: 10px;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
         .loading {
             display: none;
             margin: 30px 0;
@@ -141,7 +156,7 @@
 
         .result {
             display: none;
-            margin: 30px 0;
+            margin: 30px 0 0;
             padding: 20px;
             background: #f8f9ff;
             border-radius: 15px;
@@ -153,8 +168,6 @@
             color: #28a745;
             margin-bottom: 15px;
         }
-
-
 
         .error {
             background: #fff5f5;
@@ -192,37 +205,6 @@
             color: #155724;
         }
 
-        .upload-btn {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: block;
-            width: 100%;
-            margin-top: 10px;
-        }
-
-        .upload-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(40, 167, 69, 0.3);
-        }
-
-        .pdf-viewer {
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .pdf-viewer h4 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 1.2rem;
-        }
-
         .action-buttons {
             display: flex;
             justify-content: center;
@@ -230,16 +212,186 @@
             flex-wrap: wrap;
         }
 
-        .action-buttons .btn {
+        /* ── Live Mode ── */
+        #liveModeContainer {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            flex-direction: column;
+            background: #1e1e2e;
+        }
+
+        #liveModeContainer.active {
+            display: flex;
+        }
+
+        .live-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #12121f;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+            gap: 16px;
+        }
+
+        .live-header-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #f5f5f5;
+            white-space: nowrap;
+        }
+
+        .live-status {
+            font-size: 0.82rem;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .live-status.ready    { background: #1a3a2a; color: #4ade80; }
+        .live-status.compiling{ background: #2a2a1a; color: #facc15; }
+        .live-status.error    { background: #3a1a1a; color: #f87171; }
+
+        .live-header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-exit {
+            background: transparent;
+            color: #aaa;
+            border: 1px solid #444;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-exit:hover {
+            background: #333;
+            color: #fff;
+            border-color: #666;
+        }
+
+        .btn-render-now {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-render-now:hover {
+            opacity: 0.85;
+        }
+
+        .live-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .live-editor-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #333;
+            min-width: 0;
+        }
+
+        .live-panel-label {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+            background: #16162a;
+            border-bottom: 1px solid #2a2a3a;
+            flex-shrink: 0;
+        }
+
+        #liveEditor {
+            flex: 1;
+            width: 100%;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 16px;
+            border: none;
+            outline: none;
+            resize: none;
+            tab-size: 4;
+            overflow: auto;
+        }
+
+        .live-pdf-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            background: #252535;
+        }
+
+        #livePdfFrame {
+            flex: 1;
+            border: none;
+            background: white;
+        }
+
+        .live-pdf-placeholder {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            gap: 12px;
+            font-size: 1rem;
+        }
+
+        .live-pdf-placeholder span:first-child {
+            font-size: 3rem;
+        }
+
+        .live-error-panel {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            color: #f87171;
+            font-family: monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            background: #1a0a0a;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- ── Main Upload UI ── -->
+    <div class="container" id="mainContainer">
         <div class="logo">LaTeX Renderer</div>
-        <div class="subtitle">Upload your LaTeX project and get a compiled PDF</div>
-        
+        <div class="subtitle">Compile your LaTeX project to PDF</div>
+
+        <div class="mode-buttons">
+            <button class="btn btn-live" onclick="enterLiveMode()">✏️ Live Mode</button>
+        </div>
+
         <div class="upload-area" id="uploadArea">
             <input type="file" class="file-input" id="fileInput" accept=".zip" />
             <div class="upload-icon">📁</div>
@@ -273,7 +425,35 @@
         <div class="result" id="result"></div>
     </div>
 
+    <!-- ── Live Mode Container ── -->
+    <div id="liveModeContainer">
+        <div class="live-header">
+            <span class="live-header-title">✏️ LaTeX Live Mode</span>
+            <span class="live-status ready" id="liveStatus">Ready</span>
+            <div class="live-header-actions">
+                <button class="btn-render-now" onclick="liveRender()">▶ Render Now</button>
+                <button class="btn-exit" onclick="exitLiveMode()">✕ Exit</button>
+            </div>
+        </div>
+        <div class="live-body">
+            <div class="live-editor-panel">
+                <div class="live-panel-label">LaTeX Source</div>
+                <textarea id="liveEditor" spellcheck="false"></textarea>
+            </div>
+            <div class="live-pdf-panel" id="livePdfPanel">
+                <div class="live-panel-label">Preview</div>
+                <div class="live-pdf-placeholder" id="livePdfPlaceholder">
+                    <span>📄</span>
+                    <span>Start typing to see your PDF</span>
+                </div>
+                <iframe id="livePdfFrame" style="display:none;"></iframe>
+                <div class="live-error-panel" id="liveErrorPanel" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        /* ── Upload Mode ── */
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const loading = document.getElementById('loading');
@@ -283,7 +463,6 @@
         const uploadText = document.getElementById('uploadText');
         const uploadHint = document.getElementById('uploadHint');
 
-        // Drag and drop functionality
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -297,45 +476,26 @@
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
+            if (files.length > 0) handleFile(files[0]);
         });
 
-        // Click to upload - improved event handling
         uploadArea.addEventListener('click', (e) => {
-            // Don't trigger if clicking on the file input itself
-            if (e.target !== fileInput) {
-                fileInput.click();
-            }
+            if (e.target !== fileInput) fileInput.click();
         });
 
         fileInput.addEventListener('change', (e) => {
-            console.log('File selected:', e.target.files[0]?.name);
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
         });
 
-
-
         function handleFile(file) {
-            console.log('Handling file:', file.name, 'Size:', file.size, 'Type:', file.type);
-            
             if (!file.name.endsWith('.zip')) {
                 showError('Please select a ZIP file containing your LaTeX project.');
                 return;
             }
-
-            // Show file selected indicator and start compilation immediately
             selectedFileName.textContent = file.name;
             fileSelected.style.display = 'block';
             uploadText.textContent = 'File uploaded, starting compilation...';
             uploadHint.textContent = 'Please wait while we compile your LaTeX project';
-
-            console.log('File validation passed, starting compilation immediately');
-            
-            // Start compilation immediately
             uploadFile(file);
         }
 
@@ -345,27 +505,15 @@
             formData.append('engine', 'latexmk');
             formData.append('runs', '3');
 
-            // Show loading with compilation steps
             loading.style.display = 'block';
             result.style.display = 'none';
-            
-            // Update upload area to show compilation in progress
             uploadText.textContent = 'Compilation in progress...';
             uploadHint.textContent = 'Please wait while we process your LaTeX project';
-            
-            // Reset file input for next upload
             fileInput.value = '';
             fileSelected.style.display = 'none';
 
             try {
-                const response = await fetch('/render', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                console.log('Response status:', response.status);
-                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
+                const response = await fetch('/render', { method: 'POST', body: formData });
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
@@ -374,30 +522,17 @@
                         showError(data.error || 'Compilation failed. Please check your LaTeX code.');
                     }
                 } else {
-                    // Handle HTTP error responses
                     let errorMessage = 'Compilation failed';
-                    
                     try {
                         const errorData = await response.json();
                         errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
-                    } catch (parseError) {
-                        // If we can't parse the error response, use the status text
+                    } catch (_) {
                         errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                        
-                        // Provide specific guidance for common errors
-                        if (response.status === 500) {
-                            errorMessage += '. This usually means LaTeX tools are not available. Please use the Docker container for full functionality.';
-                        } else if (response.status === 400) {
-                            errorMessage += '. Please check your ZIP file contains a valid LaTeX project.';
-                        } else if (response.status === 422) {
-                            errorMessage += '. LaTeX compilation failed. Check your source code for errors.';
-                        }
+                        if (response.status === 422) errorMessage += '. LaTeX compilation failed. Check your source code for errors.';
                     }
-                    
                     showError(errorMessage);
                 }
             } catch (error) {
-                console.error('Network or parsing error:', error);
                 showError('Network error occurred while processing your file. Please check your connection and try again.');
             } finally {
                 loading.style.display = 'none';
@@ -405,13 +540,9 @@
         }
 
         function showSuccess(data) {
-            // Hide loading screen when showing success
             loading.style.display = 'none';
-            
-            // Reset upload area text back to original state
             uploadText.textContent = 'Drag & drop your ZIP file here';
             uploadHint.textContent = 'or click to browse';
-            
             result.className = 'result';
             result.innerHTML = `
                 <div class="success-icon">✅</div>
@@ -422,76 +553,182 @@
                     <p><strong>Size:</strong> ${(data.size_bytes / 1024).toFixed(1)} KB</p>
                     <p><strong>Expires:</strong> ${new Date(data.expires_at).toLocaleString()}</p>
                 </div>
-                <div class="pdf-viewer">
-                    <h4>📄 PDF Ready!</h4>
-                    <div style="text-align: center; padding: 40px 20px; background: #f8f9fa; border-radius: 12px; border: 2px dashed #dee2e6;">
-                        <div style="font-size: 4rem; margin-bottom: 20px;">📄</div>
-                        <h3 style="margin: 0 0 15px 0; color: #28a745;">Compilation Successful!</h3>
-                        <p style="margin: 0 0 25px 0; color: #666; font-size: 1.1rem;">
-                            Your LaTeX project has been compiled successfully.<br>
-                            Click the button below to view the PDF in your browser.
-                        </p>
-                        <button class="btn" onclick="window.open('${data.download_url}', '_blank')" style="font-size: 1.2rem; padding: 15px 30px; background: #28a745; border-color: #28a745;">
-                            🔗 Open PDF in Browser
-                        </button>
-                    </div>
+                <div style="text-align:center;padding:40px 20px;background:#f8f9fa;border-radius:12px;border:2px dashed #dee2e6;margin:15px 0;">
+                    <div style="font-size:4rem;margin-bottom:20px;">📄</div>
+                    <p style="margin:0 0 25px;color:#666;font-size:1.1rem;">Your LaTeX project has been compiled successfully.</p>
+                    <button class="btn" onclick="window.open('${data.download_url}', '_blank')" style="background:#28a745;">
+                        🔗 Open PDF in Browser
+                    </button>
                 </div>
-                <div class="action-buttons" style="margin-top: 20px; text-align: center;">
-                    <button class="btn" onclick="window.open('${data.download_url}', '_blank')" style="margin-right: 10px;">
-                        🔗 Open in New Tab
-                    </button>
-                    <button class="btn" onclick="resetInterface()">
-                        📁 Upload Another File
-                    </button>
+                <div class="action-buttons" style="margin-top:20px;">
+                    <button class="btn" onclick="window.open('${data.download_url}', '_blank')">🔗 Open in New Tab</button>
+                    <button class="btn" onclick="resetInterface()">📁 Upload Another File</button>
                 </div>
             `;
             result.style.display = 'block';
         }
 
         function showError(message) {
-            // Hide loading screen when showing error
             loading.style.display = 'none';
-            
-            // Reset upload area text back to original state
             uploadText.textContent = 'Drag & drop your ZIP file here';
             uploadHint.textContent = 'or click to browse';
-            
             result.className = 'result error';
             result.innerHTML = `
                 <div class="error-icon">❌</div>
                 <h3>Error</h3>
                 <p>${message}</p>
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 20px 0; text-align: left;">
-                    <h4 style="margin: 0 0 10px 0; color: #856404;">🔧 Troubleshooting Tips:</h4>
-                    <ul style="margin: 0; padding-left: 20px; color: #856404;">
+                <div style="background:#fff3cd;border:1px solid #ffeaa7;border-radius:6px;padding:15px;margin:20px 0;text-align:left;">
+                    <h4 style="margin:0 0 10px;color:#856404;">🔧 Troubleshooting Tips:</h4>
+                    <ul style="margin:0;padding-left:20px;color:#856404;">
                         <li>Ensure your ZIP file contains a valid LaTeX project with a main .tex file</li>
-                        <li>For local testing: LaTeX tools may not be available - use Docker for full functionality</li>
                         <li>Check that your LaTeX code compiles without errors</li>
                         <li>Verify the ZIP file is not corrupted</li>
                     </ul>
                 </div>
-                <div style="text-align: center; margin-top: 20px;">
-                    <button class="btn" onclick="resetInterface()">
-                        📁 Try Another File
-                    </button>
+                <div style="text-align:center;margin-top:20px;">
+                    <button class="btn" onclick="resetInterface()">📁 Try Another File</button>
                 </div>
             `;
             result.style.display = 'block';
         }
 
         function resetInterface() {
-            // Reset all interface elements
             result.style.display = 'none';
             loading.style.display = 'none';
             fileSelected.style.display = 'none';
             uploadText.textContent = 'Drag & drop your ZIP file here';
             uploadHint.textContent = 'or click to browse';
-            
-            // Reset file input
             fileInput.value = '';
-            
-            console.log('Interface reset for new upload');
         }
+
+        /* ── Live Mode ── */
+        const DEFAULT_TEX = `\\documentclass{article}
+\\usepackage{amsmath}
+
+\\title{My Document}
+\\author{Author}
+\\date{\\today}
+
+\\begin{document}
+\\maketitle
+
+\\section{Introduction}
+Hello, \\LaTeX! This is a live preview.
+
+\\section{Math Example}
+The quadratic formula is:
+\\[
+  x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+\\]
+
+\\section{Lists}
+\\begin{itemize}
+  \\item First item
+  \\item Second item
+  \\item Third item
+\\end{itemize}
+
+\\end{document}`;
+
+        const liveEditor     = document.getElementById('liveEditor');
+        const liveStatus     = document.getElementById('liveStatus');
+        const livePdfFrame   = document.getElementById('livePdfFrame');
+        const livePdfPlaceholder = document.getElementById('livePdfPlaceholder');
+        const liveErrorPanel = document.getElementById('liveErrorPanel');
+
+        let liveDebounceTimer = null;
+        let currentBlobUrl    = null;
+        let liveRendering     = false;
+
+        function enterLiveMode() {
+            document.getElementById('liveModeContainer').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            if (!liveEditor.value) {
+                liveEditor.value = DEFAULT_TEX;
+            }
+            liveEditor.focus();
+        }
+
+        function exitLiveMode() {
+            document.getElementById('liveModeContainer').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function setLiveStatus(state, text) {
+            liveStatus.className = `live-status ${state}`;
+            liveStatus.textContent = text;
+        }
+
+        async function liveRender() {
+            if (liveRendering) return;
+            const source = liveEditor.value.trim();
+            if (!source) return;
+
+            liveRendering = true;
+            setLiveStatus('compiling', 'Compiling…');
+
+            try {
+                const formData = new FormData();
+                formData.append('source', source);
+                formData.append('runs', '3');
+
+                const response = await fetch('/render-source', { method: 'POST', body: formData });
+
+                if (response.ok && response.headers.get('content-type')?.includes('application/pdf')) {
+                    const blob = await response.blob();
+                    const newUrl = URL.createObjectURL(blob);
+
+                    // Revoke previous blob to free memory
+                    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+                    currentBlobUrl = newUrl;
+
+                    livePdfPlaceholder.style.display = 'none';
+                    liveErrorPanel.style.display = 'none';
+                    livePdfFrame.style.display = 'block';
+                    livePdfFrame.src = newUrl;
+
+                    setLiveStatus('ready', 'Ready');
+                } else {
+                    let errText = `HTTP ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        errText = errData.error || errText;
+                        if (errData.log) errText += '\n\n' + errData.log;
+                    } catch (_) {}
+                    showLiveError(errText);
+                }
+            } catch (err) {
+                showLiveError('Network error: ' + err.message);
+            } finally {
+                liveRendering = false;
+            }
+        }
+
+        function showLiveError(message) {
+            livePdfPlaceholder.style.display = 'none';
+            livePdfFrame.style.display = 'none';
+            liveErrorPanel.style.display = 'block';
+            liveErrorPanel.textContent = message;
+            setLiveStatus('error', 'Error');
+        }
+
+        // Debounced auto-render on input (1.5 s delay)
+        liveEditor.addEventListener('input', () => {
+            clearTimeout(liveDebounceTimer);
+            setLiveStatus('compiling', 'Waiting…');
+            liveDebounceTimer = setTimeout(liveRender, 1500);
+        });
+
+        // Handle Tab key in editor
+        liveEditor.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = liveEditor.selectionStart;
+                const end   = liveEditor.selectionEnd;
+                liveEditor.value = liveEditor.value.substring(0, start) + '    ' + liveEditor.value.substring(end);
+                liveEditor.selectionStart = liveEditor.selectionEnd = start + 4;
+            }
+        });
     </script>
 </body>
 </html>
