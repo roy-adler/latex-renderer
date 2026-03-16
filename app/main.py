@@ -1,12 +1,23 @@
 import io, os, shutil, tempfile, zipfile, subprocess, pathlib, json, uuid, time
 from datetime import datetime, timedelta
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import threading
 
 # FastAPI app
 app = FastAPI(title="LaTeX Render API")
+
+# Rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(status_code=429, content={"error": "Rate limit exceeded. Try again later."})
 
 # File storage configuration
 STORAGE_DIR = "/tmp/latex_storage"
@@ -22,6 +33,11 @@ file_metadata = {}
 def _extract_zip_to_tmp(zip_bytes: bytes) -> str:
     workdir = tempfile.mkdtemp(prefix="latexapi_")
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+        for member in z.namelist():
+            target = os.path.realpath(os.path.join(workdir, member))
+            if not target.startswith(os.path.realpath(workdir)):
+                shutil.rmtree(workdir, ignore_errors=True)
+                raise HTTPException(400, f"Invalid path in zip: {member}")
         z.extractall(workdir)
     return workdir
 
@@ -42,16 +58,16 @@ def _detect_entrypoint(workdir: str, explicit: str | None) -> str:
         return str(tex_files[0])
     raise HTTPException(400, "Multiple .tex files found; provide 'entrypoint'.")
 
-def _run(cmd: list[str], cwd: str, timeout: int = 180) -> subprocess.CompletedProcess:
+def _run(cmd: list[str], cwd: str, timeout: int = 60) -> subprocess.CompletedProcess:
     # resource limits can be added via prlimit/ulimit in Docker
     return subprocess.run(
         cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=False
     )
 
-def _compile_latexmk(entry: str, allow_shell_escape: bool, runs: int) -> tuple[str, str]:
+def _compile_latexmk(entry: str, runs: int) -> tuple[str, str]:
     # latexmk will call pdflatex/xelatex/lualatex/bibtex/biber as needed
     # default to pdf mode; nonstop to produce logs even on errors
-    shell = "-shell-escape" if allow_shell_escape else "-no-shell-escape"
+    shell = "-no-shell-escape"
     cmd = ["latexmk", "-pdf", "-interaction=nonstopmode", shell, "-halt-on-error", "-file-line-error", "-silent", "-f"]
     # Force pdflatex instead of XeLaTeX/LuaLaTeX
     cmd += ["-pdflatex=pdflatex %O %S"]
@@ -179,11 +195,12 @@ async def root():
         }
 
 @app.post("/render")
+@limiter.limit("10/minute")
 async def render(
+    request: Request,
     project: UploadFile = File(...),
     engine: str = Form("latexmk"),
     entrypoint: str | None = Form(None),
-    allow_shell_escape: bool = Form(False),
     runs: int = Form(3),
 ):
     print(f"DEBUG: Render request received - engine: {engine}, entrypoint: {entrypoint}")
@@ -205,7 +222,7 @@ async def render(
         print(f"DEBUG: Entrypoint detected: {entry}")
         
         print("DEBUG: Starting LaTeX compilation...")
-        pdf_path, log = _compile_latexmk(entry, allow_shell_escape, runs)
+        pdf_path, log = _compile_latexmk(entry, runs)
         print(f"DEBUG: Compilation completed, PDF path: {pdf_path}")
 
         if not pathlib.Path(pdf_path).exists():
@@ -303,10 +320,11 @@ async def download_file(file_id: str):
     )
 
 @app.post("/render-source")
+@limiter.limit("10/minute")
 async def render_source(
+    request: Request,
     source: str = Form(...),
     filename: str = Form("main.tex"),
-    allow_shell_escape: bool = Form(False),
     runs: int = Form(3),
 ):
     """Compile raw LaTeX source text and return the PDF directly (used by Live Mode)."""
@@ -315,7 +333,7 @@ async def render_source(
     try:
         with open(entry, "w", encoding="utf-8") as f:
             f.write(source)
-        pdf_path, log = _compile_latexmk(entry, allow_shell_escape, runs)
+        pdf_path, log = _compile_latexmk(entry, runs)
         if not pathlib.Path(pdf_path).exists():
             return JSONResponse(
                 status_code=422,
@@ -332,30 +350,7 @@ async def render_source(
         shutil.rmtree(workdir, ignore_errors=True)
 
 
-@app.get("/files")
-async def list_files():
-    """List all available files with their metadata"""
-    files = []
-    for file_id, metadata in file_metadata.items():
-        files.append({
-            "file_id": file_id,
-            "filename": metadata["filename"],
-            "original_filename": metadata.get("original_filename", metadata["filename"]),
-            "project_name": metadata.get("project_name", "Unknown"),
-            "created_at": metadata["created_at"].isoformat(),
-            "expires_at": metadata["expires_at"].isoformat(),
-            "size_bytes": metadata["size"],
-            "download_url": f"{STORAGE_URL}/{file_id}"
-        })
-    
-    return {
-        "files": files,
-        "total_files": len(files),
-        "storage_directory": STORAGE_DIR
-    }
-
-# Note: Files are served through the custom endpoint above, not through static file mounting
-# This allows us to control Content-Disposition headers for inline PDF display
+# Files are served through the download endpoint above with unique IDs
 
 # Mount static files for the web interface
 # Use absolute path for Docker compatibility

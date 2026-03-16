@@ -23,6 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app /app
 
+# Security: restrict LaTeX file access to current directory only (paranoid mode)
+RUN echo "openin_any = p" >> $(kpsewhich texmf.cnf) && \
+    echo "openout_any = p" >> $(kpsewhich texmf.cnf)
+
 # Security: run as non-root
 RUN useradd -m runner
 USER runner
