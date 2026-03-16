@@ -305,11 +305,25 @@
         }
 
         .live-editor-panel {
-            flex: 1;
             display: flex;
             flex-direction: column;
+            min-width: 100px;
+            width: 50%;
+        }
+
+        .live-divider {
+            width: 6px;
+            cursor: col-resize;
+            background: #2a2a3a;
+            border-left: 1px solid #333;
             border-right: 1px solid #333;
-            min-width: 0;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+
+        .live-divider:hover,
+        .live-divider.dragging {
+            background: #667eea;
         }
 
         .live-panel-label {
@@ -344,7 +358,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            min-width: 0;
+            min-width: 100px;
             background: #252535;
         }
 
@@ -440,6 +454,7 @@
                 <div class="live-panel-label">LaTeX Source</div>
                 <textarea id="liveEditor" spellcheck="false"></textarea>
             </div>
+            <div class="live-divider" id="liveDivider"></div>
             <div class="live-pdf-panel" id="livePdfPanel">
                 <div class="live-panel-label">Preview</div>
                 <div class="live-pdf-placeholder" id="livePdfPlaceholder">
@@ -718,6 +733,40 @@ The quadratic formula is:
             setLiveStatus('compiling', 'Waiting…');
             liveDebounceTimer = setTimeout(liveRender, 1500);
         });
+
+        // Draggable divider
+        (() => {
+            const divider = document.getElementById('liveDivider');
+            const editorPanel = document.querySelector('.live-editor-panel');
+            const liveBody = document.querySelector('.live-body');
+            let dragging = false;
+
+            divider.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                dragging = true;
+                divider.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!dragging) return;
+                const rect = liveBody.getBoundingClientRect();
+                const offset = e.clientX - rect.left;
+                const pct = (offset / rect.width) * 100;
+                const clamped = Math.min(Math.max(pct, 10), 90);
+                editorPanel.style.width = clamped + '%';
+                editorPanel.style.flex = 'none';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (!dragging) return;
+                dragging = false;
+                divider.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            });
+        })();
 
         // Handle Tab key in editor
         liveEditor.addEventListener('keydown', (e) => {
