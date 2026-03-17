@@ -5,4 +5,11 @@ services:
       - "8080:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - JWT_SECRET=change-me-in-production
+      - DATABASE_PATH=/data/latex_renderer.db
+    volumes:
+      - latex-data:/data
     restart: unless-stopped
+
+volumes:
+  latex-data:

@@ -1,15 +1,26 @@
-import io, os, shutil, tempfile, zipfile, subprocess, pathlib, json, uuid, time
+import io, os, re, shutil, tempfile, zipfile, subprocess, pathlib, json, uuid, time
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import threading
 
+from database import (
+    init_db, create_user, get_user_by_email, get_user_by_id,
+    create_project, list_projects, get_project, update_project, delete_project,
+    create_share_link, get_share_link, list_share_links, delete_share_link,
+)
+from auth import hash_password, verify_password, create_token, get_current_user, require_user
+
 # FastAPI app
 app = FastAPI(title="LaTeX Render API")
+
+# Initialize database
+init_db()
 
 # Rate limiting
 limiter = Limiter(key_func=get_remote_address)
@@ -349,6 +360,138 @@ async def render_source(
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
+
+# ─── Pydantic models for JSON endpoints ───
+
+class AuthBody(BaseModel):
+    email: str
+    password: str
+
+class ProjectBody(BaseModel):
+    title: str | None = None
+    source: str | None = None
+
+class ShareBody(BaseModel):
+    access_level: str
+
+class SharedUpdateBody(BaseModel):
+    source: str
+
+# ─── Auth endpoints ───
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+@app.post("/api/auth/register")
+@limiter.limit("5/minute")
+async def auth_register(request: Request, body: AuthBody):
+    if not EMAIL_RE.match(body.email):
+        raise HTTPException(400, "Invalid email format")
+    if len(body.password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+    pw_hash = hash_password(body.password)
+    user = create_user(body.email.lower().strip(), pw_hash)
+    if user is None:
+        raise HTTPException(409, "Email already registered")
+    token = create_token(user["id"])
+    return {"token": token, "user": {"id": user["id"], "email": user["email"]}}
+
+@app.post("/api/auth/login")
+@limiter.limit("10/minute")
+async def auth_login(request: Request, body: AuthBody):
+    user = get_user_by_email(body.email.lower().strip())
+    if not user or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(401, "Invalid email or password")
+    token = create_token(user["id"])
+    return {"token": token, "user": {"id": user["id"], "email": user["email"]}}
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    user = require_user(request)
+    return {"id": user["id"], "email": user["email"]}
+
+# ─── Project endpoints ───
+
+@app.get("/api/projects")
+async def api_list_projects(request: Request):
+    user = require_user(request)
+    return list_projects(user["id"])
+
+@app.post("/api/projects")
+async def api_create_project(request: Request, body: ProjectBody):
+    user = require_user(request)
+    title = body.title or "Untitled Project"
+    source = body.source or ""
+    project = create_project(user["id"], title, source)
+    return project
+
+@app.get("/api/projects/{project_id}")
+async def api_get_project(project_id: str, request: Request):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    links = list_share_links(project_id)
+    return {**project, "share_links": links}
+
+@app.put("/api/projects/{project_id}")
+async def api_update_project(project_id: str, request: Request, body: ProjectBody):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    updated = update_project(project_id, title=body.title, source=body.source)
+    return updated
+
+@app.delete("/api/projects/{project_id}")
+async def api_delete_project(project_id: str, request: Request):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    delete_project(project_id)
+    return {"ok": True}
+
+# ─── Share link endpoints ───
+
+@app.post("/api/projects/{project_id}/share")
+async def api_create_share(project_id: str, request: Request, body: ShareBody):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    if body.access_level not in ("readonly", "contributor"):
+        raise HTTPException(400, "access_level must be 'readonly' or 'contributor'")
+    link = create_share_link(project_id, body.access_level)
+    return {"link_id": link["id"], "access_level": link["access_level"], "created_at": link["created_at"]}
+
+@app.delete("/api/share/{link_id}")
+async def api_delete_share(link_id: str, request: Request):
+    user = require_user(request)
+    link = get_share_link(link_id)
+    if not link or link["user_id"] != user["id"]:
+        raise HTTPException(404, "Share link not found")
+    delete_share_link(link_id)
+    return {"ok": True}
+
+@app.get("/api/shared/{link_id}")
+async def api_get_shared(link_id: str):
+    link = get_share_link(link_id)
+    if not link:
+        raise HTTPException(404, "Share link not found or expired")
+    return {
+        "project": {"id": link["project_id"], "title": link["title"], "source": link["source"]},
+        "access_level": link["access_level"],
+    }
+
+@app.put("/api/shared/{link_id}")
+async def api_update_shared(link_id: str, body: SharedUpdateBody):
+    link = get_share_link(link_id)
+    if not link:
+        raise HTTPException(404, "Share link not found")
+    if link["access_level"] != "contributor":
+        raise HTTPException(403, "This link is readonly")
+    update_project(link["project_id"], source=body.source)
+    return {"ok": True}
 
 # Files are served through the download endpoint above with unique IDs
 

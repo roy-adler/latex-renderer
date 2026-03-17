@@ -27,8 +27,12 @@ COPY app /app
 RUN echo "openin_any = p" >> $(kpsewhich texmf.cnf) && \
     echo "openout_any = p" >> $(kpsewhich texmf.cnf)
 
+# Create data directory for SQLite
+RUN mkdir -p /data
+
 # Security: run as non-root
 RUN useradd -m runner
+RUN chown runner:runner /data
 USER runner
 
 EXPOSE 8000

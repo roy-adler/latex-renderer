@@ -16,9 +16,44 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
             padding: 20px;
+        }
+
+        /* ── Top Nav Bar ── */
+        .top-nav {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-bottom: 20px;
+            min-height: 40px;
+        }
+
+        .nav-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255,255,255,0.35);
+        }
+
+        .nav-user {
+            color: rgba(255,255,255,0.85);
+            font-size: 0.85rem;
+            font-weight: 500;
         }
 
         .container {
@@ -81,6 +116,13 @@
 
         .btn-live:hover {
             box-shadow: 0 10px 20px rgba(245, 87, 108, 0.3);
+        }
+
+        .btn-sm {
+            padding: 8px 18px;
+            font-size: 0.85rem;
+            margin: 3px;
+            border-radius: 20px;
         }
 
         .upload-area {
@@ -212,6 +254,216 @@
             flex-wrap: wrap;
         }
 
+        /* ── Modal ── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 36px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        .modal h2 {
+            margin-bottom: 24px;
+            color: #333;
+            text-align: center;
+        }
+
+        .modal-field {
+            margin-bottom: 16px;
+        }
+
+        .modal-field label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+
+        .modal-field input, .modal-field select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        .modal-field input:focus, .modal-field select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-error {
+            color: #e53e3e;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            display: none;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+            margin: 0;
+            padding: 12px;
+        }
+
+        .modal-link {
+            display: block;
+            text-align: center;
+            margin-top: 16px;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .modal-link:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Project Dashboard ── */
+        .dashboard {
+            display: none;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 36px;
+            max-width: 700px;
+            width: 100%;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .dashboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .dashboard-header h2 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        .project-list {
+            list-style: none;
+        }
+
+        .project-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: #f8f9ff;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.15s;
+        }
+
+        .project-card:hover {
+            transform: translateX(4px);
+        }
+
+        .project-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .project-card-title {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.05rem;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-card-date {
+            color: #888;
+            font-size: 0.8rem;
+        }
+
+        .project-card-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+
+        .project-empty {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-size: 1rem;
+        }
+
+        /* ── Share Modal ── */
+        .share-link-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 0.82rem;
+        }
+
+        .share-link-url {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #555;
+            font-family: monospace;
+        }
+
+        .share-link-badge {
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .share-link-badge.readonly {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .share-link-badge.contributor {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
         /* ── Live Mode ── */
         #liveModeContainer {
             display: none;
@@ -242,6 +494,9 @@
             font-weight: 700;
             color: #f5f5f5;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
         }
 
         .live-status {
@@ -250,16 +505,19 @@
             border-radius: 12px;
             font-weight: 600;
             transition: background 0.2s, color 0.2s;
+            flex-shrink: 0;
         }
 
         .live-status.ready    { background: #1a3a2a; color: #4ade80; }
         .live-status.compiling{ background: #2a2a1a; color: #facc15; }
         .live-status.error    { background: #3a1a1a; color: #f87171; }
+        .live-status.saved    { background: #1a2a3a; color: #60a5fa; }
 
         .live-header-actions {
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-shrink: 0;
         }
 
         .btn-exit {
@@ -297,6 +555,21 @@
         .btn-render-now:hover {
             opacity: 0.85;
         }
+
+        .btn-save {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-save:hover { opacity: 0.85; }
 
         .live-body {
             display: flex;
@@ -397,6 +670,15 @@
     </style>
 </head>
 <body>
+    <!-- ── Top Nav ── -->
+    <nav class="top-nav" id="topNav">
+        <span class="nav-user" id="navUser" style="display:none;"></span>
+        <button class="nav-btn" id="navProjects" style="display:none;" onclick="showDashboard()">My Projects</button>
+        <button class="nav-btn" id="navLogin" onclick="showAuthModal('login')">Login</button>
+        <button class="nav-btn" id="navRegister" onclick="showAuthModal('register')">Sign Up</button>
+        <button class="nav-btn" id="navLogout" style="display:none;" onclick="auth.logout()">Logout</button>
+    </nav>
+
     <!-- ── Main Upload UI ── -->
     <div class="container" id="mainContainer">
         <div class="logo">LaTeX Renderer</div>
@@ -439,12 +721,66 @@
         <div class="result" id="result"></div>
     </div>
 
+    <!-- ── Project Dashboard ── -->
+    <div class="dashboard" id="projectDashboard">
+        <div class="dashboard-header">
+            <h2>My Projects</h2>
+            <button class="btn btn-sm" onclick="createNewProject()">+ New Project</button>
+        </div>
+        <ul class="project-list" id="projectList"></ul>
+        <div style="text-align:center; margin-top:16px;">
+            <button class="nav-btn" style="background:rgba(102,126,234,0.15); color:#667eea; border-color:#667eea;" onclick="showHome()">Back to Home</button>
+        </div>
+    </div>
+
+    <!-- ── Auth Modal ── -->
+    <div class="modal-overlay" id="authModal">
+        <div class="modal">
+            <h2 id="authModalTitle">Login</h2>
+            <div class="modal-error" id="authError"></div>
+            <div class="modal-field">
+                <label for="authEmail">Email</label>
+                <input type="email" id="authEmail" placeholder="you@example.com" />
+            </div>
+            <div class="modal-field">
+                <label for="authPassword">Password</label>
+                <input type="password" id="authPassword" placeholder="Min. 8 characters" />
+            </div>
+            <div class="modal-actions">
+                <button class="btn" style="background:#ccc;color:#333;" onclick="closeAuthModal()">Cancel</button>
+                <button class="btn" id="authSubmitBtn" onclick="submitAuth()">Login</button>
+            </div>
+            <span class="modal-link" id="authToggleLink"></span>
+        </div>
+    </div>
+
+    <!-- ── Share Modal ── -->
+    <div class="modal-overlay" id="shareModal">
+        <div class="modal">
+            <h2 id="shareModalTitle">Share Project</h2>
+            <div class="modal-error" id="shareError"></div>
+            <div class="modal-field">
+                <label>Access Level</label>
+                <select id="shareAccessLevel">
+                    <option value="readonly">Readonly</option>
+                    <option value="contributor">Contributor</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" style="background:#ccc;color:#333;" onclick="closeShareModal()">Close</button>
+                <button class="btn" onclick="generateShareLink()">Generate Link</button>
+            </div>
+            <div id="shareLinksContainer" style="margin-top:20px;"></div>
+        </div>
+    </div>
+
     <!-- ── Live Mode Container ── -->
     <div id="liveModeContainer">
         <div class="live-header">
-            <span class="live-header-title">✏️ LaTeX Live Mode</span>
+            <span class="live-header-title" id="liveHeaderTitle">✏️ LaTeX Live Mode</span>
             <span class="live-status ready" id="liveStatus">Ready</span>
             <div class="live-header-actions">
+                <button class="btn-save" id="liveSaveBtn" style="display:none;" onclick="saveProject()">Save</button>
                 <button class="btn-render-now" onclick="liveRender()">▶ Render Now</button>
                 <button class="btn-exit" onclick="exitLiveMode()">✕ Exit</button>
             </div>
@@ -468,7 +804,333 @@
     </div>
 
     <script>
-        /* ── Upload Mode ── */
+        /* ═══════════════════════════════════════
+           Auth State
+           ═══════════════════════════════════════ */
+        const auth = {
+            token: localStorage.getItem('latex_token'),
+            user: JSON.parse(localStorage.getItem('latex_user') || 'null'),
+            isLoggedIn() { return !!this.token; },
+            login(token, user) {
+                this.token = token;
+                this.user = user;
+                localStorage.setItem('latex_token', token);
+                localStorage.setItem('latex_user', JSON.stringify(user));
+                updateAuthUI();
+            },
+            logout() {
+                this.token = null;
+                this.user = null;
+                localStorage.removeItem('latex_token');
+                localStorage.removeItem('latex_user');
+                updateAuthUI();
+                showHome();
+            },
+            headers() {
+                const h = { 'Content-Type': 'application/json' };
+                if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+                return h;
+            },
+        };
+
+        async function authFetch(url, options = {}) {
+            options.headers = { ...options.headers, ...auth.headers() };
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                auth.logout();
+                showAuthModal('login');
+                throw new Error('Session expired');
+            }
+            return res;
+        }
+
+        function updateAuthUI() {
+            const loggedIn = auth.isLoggedIn();
+            document.getElementById('navLogin').style.display = loggedIn ? 'none' : '';
+            document.getElementById('navRegister').style.display = loggedIn ? 'none' : '';
+            document.getElementById('navProjects').style.display = loggedIn ? '' : 'none';
+            document.getElementById('navLogout').style.display = loggedIn ? '' : 'none';
+            const userEl = document.getElementById('navUser');
+            if (loggedIn) {
+                userEl.textContent = auth.user.email;
+                userEl.style.display = '';
+            } else {
+                userEl.style.display = 'none';
+            }
+        }
+
+        /* ═══════════════════════════════════════
+           Auth Modal
+           ═══════════════════════════════════════ */
+        let authMode = 'login';
+
+        function showAuthModal(mode) {
+            authMode = mode;
+            document.getElementById('authModalTitle').textContent = mode === 'login' ? 'Login' : 'Sign Up';
+            document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'Login' : 'Sign Up';
+            document.getElementById('authToggleLink').textContent = mode === 'login'
+                ? "Don't have an account? Sign up"
+                : 'Already have an account? Login';
+            document.getElementById('authToggleLink').onclick = () => showAuthModal(mode === 'login' ? 'register' : 'login');
+            document.getElementById('authError').style.display = 'none';
+            document.getElementById('authEmail').value = '';
+            document.getElementById('authPassword').value = '';
+            document.getElementById('authModal').classList.add('active');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.remove('active');
+        }
+
+        async function submitAuth() {
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value;
+            const errEl = document.getElementById('authError');
+            errEl.style.display = 'none';
+
+            if (!email || !password) {
+                errEl.textContent = 'Please fill in both fields';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            const url = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    errEl.textContent = data.detail || 'Something went wrong';
+                    errEl.style.display = 'block';
+                    return;
+                }
+                auth.login(data.token, data.user);
+                closeAuthModal();
+            } catch (e) {
+                errEl.textContent = 'Network error';
+                errEl.style.display = 'block';
+            }
+        }
+
+        // Allow pressing Enter in auth modal
+        document.getElementById('authPassword').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitAuth();
+        });
+
+        /* ═══════════════════════════════════════
+           Routing / Views
+           ═══════════════════════════════════════ */
+        function showHome() {
+            document.getElementById('mainContainer').style.display = '';
+            document.getElementById('projectDashboard').classList.remove('active');
+            window.location.hash = '#/';
+        }
+
+        function showDashboard() {
+            if (!auth.isLoggedIn()) { showAuthModal('login'); return; }
+            document.getElementById('mainContainer').style.display = 'none';
+            document.getElementById('projectDashboard').classList.add('active');
+            window.location.hash = '#/projects';
+            loadProjects();
+        }
+
+        async function router() {
+            const hash = window.location.hash || '#/';
+            if (hash.startsWith('#/shared/')) {
+                const linkId = hash.slice(9);
+                await openSharedProject(linkId);
+            } else if (hash === '#/projects') {
+                if (auth.isLoggedIn()) showDashboard();
+                else showHome();
+            } else {
+                // default: home
+                document.getElementById('mainContainer').style.display = '';
+                document.getElementById('projectDashboard').classList.remove('active');
+            }
+        }
+
+        window.addEventListener('hashchange', router);
+
+        /* ═══════════════════════════════════════
+           Project Dashboard
+           ═══════════════════════════════════════ */
+        async function loadProjects() {
+            const listEl = document.getElementById('projectList');
+            listEl.innerHTML = '<li class="project-empty">Loading...</li>';
+            try {
+                const res = await authFetch('/api/projects');
+                const projects = await res.json();
+                if (projects.length === 0) {
+                    listEl.innerHTML = '<li class="project-empty">No projects yet. Create one to get started!</li>';
+                    return;
+                }
+                listEl.innerHTML = projects.map(p => `
+                    <li class="project-card">
+                        <div class="project-card-info">
+                            <div class="project-card-title">${escHtml(p.title)}</div>
+                            <div class="project-card-date">Updated ${new Date(p.updated_at).toLocaleString()}</div>
+                        </div>
+                        <div class="project-card-actions">
+                            <button class="btn btn-sm" onclick="openProject('${p.id}')">Open</button>
+                            <button class="btn btn-sm" style="background:#0ea5e9;" onclick="openShareModal('${p.id}', '${escHtml(p.title)}')">Share</button>
+                            <button class="btn btn-sm" style="background:#e53e3e;" onclick="confirmDeleteProject('${p.id}')">Delete</button>
+                        </div>
+                    </li>
+                `).join('');
+            } catch (e) {
+                listEl.innerHTML = '<li class="project-empty">Failed to load projects.</li>';
+            }
+        }
+
+        async function createNewProject() {
+            try {
+                const res = await authFetch('/api/projects', {
+                    method: 'POST',
+                    body: JSON.stringify({ title: 'Untitled Project', source: DEFAULT_TEX }),
+                });
+                const project = await res.json();
+                openProject(project.id);
+            } catch (e) { /* ignore */ }
+        }
+
+        async function openProject(projectId) {
+            try {
+                const res = await authFetch(`/api/projects/${projectId}`);
+                if (!res.ok) return;
+                const project = await res.json();
+                currentProject = project;
+                currentShareLink = null;
+                liveEditor.value = project.source || DEFAULT_TEX;
+                liveEditor.readOnly = false;
+                document.getElementById('liveHeaderTitle').textContent = project.title;
+                document.getElementById('liveSaveBtn').style.display = '';
+                document.getElementById('liveModeContainer').classList.add('active');
+                document.body.style.overflow = 'hidden';
+                liveEditor.focus();
+                resetLivePreview();
+            } catch (e) { /* ignore */ }
+        }
+
+        async function confirmDeleteProject(projectId) {
+            if (!confirm('Delete this project? This cannot be undone.')) return;
+            try {
+                await authFetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+                loadProjects();
+            } catch (e) { /* ignore */ }
+        }
+
+        /* ═══════════════════════════════════════
+           Share Modal
+           ═══════════════════════════════════════ */
+        let shareProjectId = null;
+
+        function openShareModal(projectId, title) {
+            shareProjectId = projectId;
+            document.getElementById('shareModalTitle').textContent = `Share "${title}"`;
+            document.getElementById('shareError').style.display = 'none';
+            document.getElementById('shareModal').classList.add('active');
+            loadShareLinks();
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.remove('active');
+            shareProjectId = null;
+        }
+
+        async function generateShareLink() {
+            const level = document.getElementById('shareAccessLevel').value;
+            const errEl = document.getElementById('shareError');
+            errEl.style.display = 'none';
+            try {
+                const res = await authFetch(`/api/projects/${shareProjectId}/share`, {
+                    method: 'POST',
+                    body: JSON.stringify({ access_level: level }),
+                });
+                if (!res.ok) {
+                    const d = await res.json();
+                    errEl.textContent = d.detail || 'Failed';
+                    errEl.style.display = 'block';
+                    return;
+                }
+                loadShareLinks();
+            } catch (e) {
+                errEl.textContent = 'Network error';
+                errEl.style.display = 'block';
+            }
+        }
+
+        async function loadShareLinks() {
+            const container = document.getElementById('shareLinksContainer');
+            container.innerHTML = 'Loading...';
+            try {
+                const res = await authFetch(`/api/projects/${shareProjectId}`);
+                const project = await res.json();
+                const links = project.share_links || [];
+                if (links.length === 0) {
+                    container.innerHTML = '<div style="color:#999;font-size:0.85rem;text-align:center;">No share links yet.</div>';
+                    return;
+                }
+                container.innerHTML = links.map(l => {
+                    const url = `${location.origin}/#/shared/${l.id}`;
+                    return `
+                        <div class="share-link-row">
+                            <span class="share-link-badge ${l.access_level}">${l.access_level}</span>
+                            <span class="share-link-url">${url}</span>
+                            <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;" onclick="copyText('${url}')">Copy</button>
+                            <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:#e53e3e;" onclick="revokeShareLink('${l.id}')">Revoke</button>
+                        </div>`;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = '<div style="color:#e53e3e;font-size:0.85rem;">Failed to load.</div>';
+            }
+        }
+
+        async function revokeShareLink(linkId) {
+            try {
+                await authFetch(`/api/share/${linkId}`, { method: 'DELETE' });
+                loadShareLinks();
+            } catch (e) { /* ignore */ }
+        }
+
+        function copyText(text) {
+            navigator.clipboard.writeText(text).catch(() => {});
+        }
+
+        /* ═══════════════════════════════════════
+           Shared Project View
+           ═══════════════════════════════════════ */
+        async function openSharedProject(linkId) {
+            try {
+                const res = await fetch(`/api/shared/${linkId}`);
+                if (!res.ok) {
+                    alert('Share link not found or expired.');
+                    showHome();
+                    return;
+                }
+                const data = await res.json();
+                currentProject = null;
+                currentShareLink = { id: linkId, access_level: data.access_level };
+                liveEditor.value = data.project.source || '';
+                liveEditor.readOnly = data.access_level === 'readonly';
+                const titleSuffix = data.access_level === 'readonly' ? ' (readonly)' : ' (contributor)';
+                document.getElementById('liveHeaderTitle').textContent = data.project.title + titleSuffix;
+                document.getElementById('liveSaveBtn').style.display = data.access_level === 'contributor' ? '' : 'none';
+                document.getElementById('liveModeContainer').classList.add('active');
+                document.body.style.overflow = 'hidden';
+                liveEditor.focus();
+                resetLivePreview();
+            } catch (e) {
+                alert('Failed to load shared project.');
+                showHome();
+            }
+        }
+
+        /* ═══════════════════════════════════════
+           Upload Mode
+           ═══════════════════════════════════════ */
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const loading = document.getElementById('loading');
@@ -572,12 +1234,12 @@
                     <div style="font-size:4rem;margin-bottom:20px;">📄</div>
                     <p style="margin:0 0 25px;color:#666;font-size:1.1rem;">Your LaTeX project has been compiled successfully.</p>
                     <button class="btn" onclick="window.open('${data.download_url}', '_blank')" style="background:#28a745;">
-                        🔗 Open PDF in Browser
+                        Open PDF in Browser
                     </button>
                 </div>
                 <div class="action-buttons" style="margin-top:20px;">
-                    <button class="btn" onclick="window.open('${data.download_url}', '_blank')">🔗 Open in New Tab</button>
-                    <button class="btn" onclick="resetInterface()">📁 Upload Another File</button>
+                    <button class="btn" onclick="window.open('${data.download_url}', '_blank')">Open in New Tab</button>
+                    <button class="btn" onclick="resetInterface()">Upload Another File</button>
                 </div>
             `;
             result.style.display = 'block';
@@ -593,7 +1255,7 @@
                 <h3>Error</h3>
                 <p>${message}</p>
                 <div style="background:#fff3cd;border:1px solid #ffeaa7;border-radius:6px;padding:15px;margin:20px 0;text-align:left;">
-                    <h4 style="margin:0 0 10px;color:#856404;">🔧 Troubleshooting Tips:</h4>
+                    <h4 style="margin:0 0 10px;color:#856404;">Troubleshooting Tips:</h4>
                     <ul style="margin:0;padding-left:20px;color:#856404;">
                         <li>Ensure your ZIP file contains a valid LaTeX project with a main .tex file</li>
                         <li>Check that your LaTeX code compiles without errors</li>
@@ -601,7 +1263,7 @@
                     </ul>
                 </div>
                 <div style="text-align:center;margin-top:20px;">
-                    <button class="btn" onclick="resetInterface()">📁 Try Another File</button>
+                    <button class="btn" onclick="resetInterface()">Try Another File</button>
                 </div>
             `;
             result.style.display = 'block';
@@ -616,7 +1278,9 @@
             fileInput.value = '';
         }
 
-        /* ── Live Mode ── */
+        /* ═══════════════════════════════════════
+           Live Mode
+           ═══════════════════════════════════════ */
         const DEFAULT_TEX = `\\documentclass{article}
 \\usepackage{amsmath}
 
@@ -654,24 +1318,95 @@ The quadratic formula is:
         let liveDebounceTimer = null;
         let currentBlobUrl    = null;
         let liveRendering     = false;
+        let currentProject    = null;    // set when editing an owned project
+        let currentShareLink  = null;    // set when editing via share link
+        let autoSaveTimer     = null;
+        let lastSavedSource   = '';
 
         function enterLiveMode() {
-            document.getElementById('liveModeContainer').classList.add('active');
-            document.body.style.overflow = 'hidden';
+            currentProject = null;
+            currentShareLink = null;
+            liveEditor.readOnly = false;
+            document.getElementById('liveHeaderTitle').textContent = '✏️ LaTeX Live Mode';
+            document.getElementById('liveSaveBtn').style.display = 'none';
             if (!liveEditor.value) {
                 liveEditor.value = DEFAULT_TEX;
             }
+            document.getElementById('liveModeContainer').classList.add('active');
+            document.body.style.overflow = 'hidden';
             liveEditor.focus();
         }
 
         function exitLiveMode() {
+            // Prompt save if project has unsaved changes
+            if (currentProject && liveEditor.value !== lastSavedSource) {
+                if (confirm('You have unsaved changes. Save before exiting?')) {
+                    saveProject();
+                }
+            }
+            const wasProject = !!currentProject;
             document.getElementById('liveModeContainer').classList.remove('active');
             document.body.style.overflow = '';
+            clearInterval(autoSaveTimer);
+            currentProject = null;
+            currentShareLink = null;
+            // If on shared hash, go home
+            if (window.location.hash.startsWith('#/shared/')) {
+                window.location.hash = '#/';
+            }
+            // Refresh dashboard if returning from a project
+            if (wasProject && document.getElementById('projectDashboard').classList.contains('active')) {
+                loadProjects();
+            }
+        }
+
+        function resetLivePreview() {
+            livePdfPlaceholder.style.display = '';
+            livePdfFrame.style.display = 'none';
+            liveErrorPanel.style.display = 'none';
+            if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+            setLiveStatus('ready', 'Ready');
+            lastSavedSource = liveEditor.value;
+            startAutoSave();
+        }
+
+        function startAutoSave() {
+            clearInterval(autoSaveTimer);
+            if (currentProject || (currentShareLink && currentShareLink.access_level === 'contributor')) {
+                autoSaveTimer = setInterval(() => {
+                    if (liveEditor.value !== lastSavedSource) saveProject();
+                }, 30000);
+            }
         }
 
         function setLiveStatus(state, text) {
             liveStatus.className = `live-status ${state}`;
             liveStatus.textContent = text;
+        }
+
+        async function saveProject() {
+            const source = liveEditor.value;
+            try {
+                if (currentProject) {
+                    await authFetch(`/api/projects/${currentProject.id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ source }),
+                    });
+                } else if (currentShareLink && currentShareLink.access_level === 'contributor') {
+                    await fetch(`/api/shared/${currentShareLink.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ source }),
+                    });
+                }
+                lastSavedSource = source;
+                setLiveStatus('saved', 'Saved');
+                setTimeout(() => {
+                    if (liveStatus.textContent === 'Saved') setLiveStatus('ready', 'Ready');
+                }, 2000);
+            } catch (e) {
+                setLiveStatus('error', 'Save failed');
+            }
         }
 
         async function liveRender() {
@@ -693,7 +1428,6 @@ The quadratic formula is:
                     const blob = await response.blob();
                     const newUrl = URL.createObjectURL(blob);
 
-                    // Revoke previous blob to free memory
                     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
                     currentBlobUrl = newUrl;
 
@@ -748,7 +1482,6 @@ The quadratic formula is:
                 divider.classList.add('dragging');
                 document.body.style.cursor = 'col-resize';
                 document.body.style.userSelect = 'none';
-                // Prevent iframe from stealing mouse events during drag
                 pdfPanel.style.pointerEvents = 'none';
             });
 
@@ -785,7 +1518,29 @@ The quadratic formula is:
                 liveEditor.value = liveEditor.value.substring(0, start) + '    ' + liveEditor.value.substring(end);
                 liveEditor.selectionStart = liveEditor.selectionEnd = start + 4;
             }
+            // Ctrl/Cmd+S to save
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                if (currentProject || (currentShareLink && currentShareLink.access_level === 'contributor')) {
+                    saveProject();
+                }
+            }
         });
+
+        /* ═══════════════════════════════════════
+           Utilities
+           ═══════════════════════════════════════ */
+        function escHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        /* ═══════════════════════════════════════
+           Init
+           ═══════════════════════════════════════ */
+        updateAuthUI();
+        router();
     </script>
 </body>
 </html>
