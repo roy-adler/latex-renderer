@@ -5,6 +5,9 @@ from datetime import datetime
 
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "./latex_renderer.db")
 
+# Ensure parent directory exists
+os.makedirs(os.path.dirname(DATABASE_PATH) or ".", exist_ok=True)
+
 def get_db():
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
@@ -12,7 +15,13 @@ def get_db():
     return conn
 
 def init_db():
-    conn = get_db()
+    try:
+        conn = get_db()
+    except Exception as e:
+        print(f"ERROR: Cannot open database at {DATABASE_PATH}: {e}")
+        print(f"  Directory exists: {os.path.isdir(os.path.dirname(DATABASE_PATH) or '.')}")
+        print(f"  Writable: {os.access(os.path.dirname(DATABASE_PATH) or '.', os.W_OK)}")
+        raise
     conn.executescript("""
         PRAGMA journal_mode=WAL;
 
