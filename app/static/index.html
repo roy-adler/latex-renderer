@@ -1370,6 +1370,19 @@
             if (hash.startsWith('#/shared/')) {
                 const linkId = hash.slice(9);
                 await openSharedProject(linkId);
+            } else if (hash.startsWith('#/projects/')) {
+                // Direct project link: #/projects/{id}
+                const projectId = hash.slice(11);
+                if (auth.isLoggedIn() && projectId) {
+                    // Only open if not already viewing this project
+                    if (!currentProject || currentProject.id !== projectId) {
+                        document.getElementById('mainContainer').style.display = 'none';
+                        document.getElementById('projectDashboard').classList.remove('active');
+                        await openProject(projectId);
+                    }
+                } else {
+                    showHome();
+                }
             } else if (hash === '#/projects') {
                 if (auth.isLoggedIn()) showDashboard();
                 else showHome();
@@ -1441,6 +1454,7 @@
                 document.getElementById('liveSaveBtn').style.display = '';
                 document.getElementById('liveModeContainer').classList.add('active');
                 document.body.style.overflow = 'hidden';
+                window.location.hash = '#/projects/' + projectId;
 
                 // Load file tree
                 projectFiles = project.files || [];
@@ -1983,9 +1997,11 @@ The quadratic formula is:
             fileContentsCache = {};
             expandedFolders = new Set();
             showFileTree(false);
-            // If on shared hash, go home
+            // Navigate back appropriately
             if (window.location.hash.startsWith('#/shared/')) {
                 window.location.hash = '#/';
+            } else if (window.location.hash.startsWith('#/projects/')) {
+                window.location.hash = '#/projects';
             }
             // Refresh dashboard if returning from a project
             if (wasProject && document.getElementById('projectDashboard').classList.contains('active')) {
