@@ -706,6 +706,7 @@
             flex-direction: column;
             min-width: 100px;
             background: #252535;
+            position: relative;
         }
 
         #pdfViewerContainer {
@@ -750,6 +751,68 @@
 
         .live-pdf-placeholder span:first-child {
             font-size: 3rem;
+        }
+
+        .pdf-loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(37, 37, 53, 0.92);
+            z-index: 10;
+            gap: 16px;
+        }
+
+        .pdf-loading-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(102, 126, 234, 0.2);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: pdf-spin 0.8s linear infinite;
+        }
+
+        @keyframes pdf-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .pdf-loading-text {
+            color: #aaa;
+            font-size: 0.85rem;
+        }
+
+        .pdf-render-progress {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            z-index: 10;
+            padding: 12px 16px;
+            background: rgba(37, 37, 53, 0.95);
+            border-bottom: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .pdf-render-progress-bar {
+            height: 4px;
+            background: rgba(102, 126, 234, 0.15);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .pdf-render-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .pdf-render-progress-label {
+            display: flex;
+            justify-content: space-between;
+            color: #aaa;
+            font-size: 0.75rem;
         }
 
         .live-error-panel {
@@ -1213,6 +1276,21 @@
                 </div>
                 <div id="pdfViewerContainer" style="display:none;"></div>
                 <div class="live-error-panel" id="liveErrorPanel" style="display:none;"></div>
+                <!-- Cache loading spinner -->
+                <div class="pdf-loading-overlay" id="pdfLoadingOverlay" style="display:none;">
+                    <div class="pdf-loading-spinner"></div>
+                    <div class="pdf-loading-text">Loading preview...</div>
+                </div>
+                <!-- Render progress bar -->
+                <div class="pdf-render-progress" id="pdfRenderProgress" style="display:none;">
+                    <div class="pdf-render-progress-bar">
+                        <div class="pdf-render-progress-fill" id="pdfRenderProgressFill"></div>
+                    </div>
+                    <div class="pdf-render-progress-label">
+                        <span id="pdfRenderStage">Compiling...</span>
+                        <span id="pdfRenderTime"></span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1485,20 +1563,35 @@
         }
 
         async function loadCachedRender(projectId) {
+            const overlay = document.getElementById('pdfLoadingOverlay');
             try {
+                // Show loading spinner
+                livePdfPlaceholder.style.display = 'none';
+                overlay.style.display = 'flex';
+
                 const res = await authFetch(`/api/projects/${projectId}/cached-render`);
-                if (res.status === 204 || !res.ok) return;
+                if (res.status === 204 || !res.ok) {
+                    overlay.style.display = 'none';
+                    livePdfPlaceholder.style.display = '';
+                    return;
+                }
                 const data = await res.json();
                 if (data && data.pdf_base64) {
                     const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
                     synctexData = data.synctex || null;
-                    livePdfPlaceholder.style.display = 'none';
                     liveErrorPanel.style.display = 'none';
                     pdfViewerContainer.style.display = 'block';
                     await renderPdfPages(pdfBytes);
+                    overlay.style.display = 'none';
                     setLiveStatus('ready', 'Loaded from cache');
+                } else {
+                    overlay.style.display = 'none';
+                    livePdfPlaceholder.style.display = '';
                 }
-            } catch (e) { /* ignore - no cache available */ }
+            } catch (e) {
+                overlay.style.display = 'none';
+                livePdfPlaceholder.style.display = '';
+            }
         }
 
         async function confirmDeleteProject(projectId) {
@@ -2013,6 +2106,8 @@ The quadratic formula is:
             livePdfPlaceholder.style.display = '';
             pdfViewerContainer.style.display = 'none';
             liveErrorPanel.style.display = 'none';
+            document.getElementById('pdfLoadingOverlay').style.display = 'none';
+            document.getElementById('pdfRenderProgress').style.display = 'none';
             pdfDoc = null;
             synctexData = null;
             pdfPageCanvases = [];
@@ -2092,10 +2187,60 @@ The quadratic formula is:
             }
         }
 
+        /* ── Render progress bar (right panel) ── */
+        let renderProgressTimer = null;
+        let renderProgressStart = 0;
+        const RENDER_ESTIMATE_SEC = 12;
+        const RENDER_STAGES = [
+            {pct: 0,  label: 'Saving files...'},
+            {pct: 10, label: 'Compiling LaTeX...'},
+            {pct: 85, label: 'Generating PDF...'},
+            {pct: 95, label: 'Transferring...'},
+        ];
+
+        function showRenderProgress() {
+            renderProgressStart = Date.now();
+            const el = document.getElementById('pdfRenderProgress');
+            el.style.display = '';
+            document.getElementById('pdfRenderProgressFill').style.width = '0%';
+            document.getElementById('pdfRenderStage').textContent = RENDER_STAGES[0].label;
+            document.getElementById('pdfRenderTime').textContent = `~${RENDER_ESTIMATE_SEC}s`;
+            renderProgressTimer = setInterval(tickRenderProgress, 300);
+        }
+
+        function tickRenderProgress() {
+            const elapsed = (Date.now() - renderProgressStart) / 1000;
+            const ratio = Math.min(elapsed / RENDER_ESTIMATE_SEC, 1);
+            const pct = Math.min(95, Math.round(ratio * 100 * (1 - 0.3 * ratio)));
+
+            document.getElementById('pdfRenderProgressFill').style.width = pct + '%';
+
+            // Pick stage label
+            let stage = RENDER_STAGES[0].label;
+            for (let i = RENDER_STAGES.length - 1; i >= 0; i--) {
+                if (pct >= RENDER_STAGES[i].pct) { stage = RENDER_STAGES[i].label; break; }
+            }
+            document.getElementById('pdfRenderStage').textContent = stage;
+
+            const remaining = Math.max(0, Math.round(RENDER_ESTIMATE_SEC - elapsed));
+            document.getElementById('pdfRenderTime').textContent = remaining > 0 ? `~${remaining}s` : 'almost done...';
+        }
+
+        function hideRenderProgress() {
+            clearInterval(renderProgressTimer);
+            renderProgressTimer = null;
+            const el = document.getElementById('pdfRenderProgress');
+            document.getElementById('pdfRenderProgressFill').style.width = '100%';
+            document.getElementById('pdfRenderStage').textContent = 'Done';
+            document.getElementById('pdfRenderTime').textContent = '';
+            setTimeout(() => { el.style.display = 'none'; }, 400);
+        }
+
         async function liveRender() {
             if (liveRendering) return;
             liveRendering = true;
             setLiveStatus('compiling', 'Compiling…');
+            showRenderProgress();
 
             try {
                 let response;
@@ -2126,7 +2271,7 @@ The quadratic formula is:
                 } else {
                     // Single-file render
                     const source = liveEditor.value.trim();
-                    if (!source) { liveRendering = false; return; }
+                    if (!source) { liveRendering = false; hideRenderProgress(); return; }
                     const formData = new FormData();
                     formData.append('source', source);
                     formData.append('runs', '3');
@@ -2162,6 +2307,7 @@ The quadratic formula is:
             } catch (err) {
                 showLiveError('Network error: ' + err.message);
             } finally {
+                hideRenderProgress();
                 liveRendering = false;
             }
         }
