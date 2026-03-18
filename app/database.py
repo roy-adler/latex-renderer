@@ -47,6 +47,7 @@ def init_db():
             project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
             filename TEXT NOT NULL,
             content TEXT NOT NULL DEFAULT '',
+            is_binary INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now')),
             UNIQUE(project_id, filename)
@@ -65,6 +66,13 @@ def init_db():
         conn.execute("SELECT main_file FROM projects LIMIT 1")
     except sqlite3.OperationalError:
         conn.execute("ALTER TABLE projects ADD COLUMN main_file TEXT NOT NULL DEFAULT 'main.tex'")
+        conn.commit()
+
+    # Migration: add is_binary column if missing (existing databases)
+    try:
+        conn.execute("SELECT is_binary FROM project_files LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE project_files ADD COLUMN is_binary INTEGER NOT NULL DEFAULT 0")
         conn.commit()
 
     # Migration: migrate projects.source into project_files for existing projects
@@ -195,13 +203,13 @@ def delete_project(project_id: str):
 
 # --- Project Files ---
 
-def create_project_file(project_id: str, filename: str, content: str = "") -> dict:
+def create_project_file(project_id: str, filename: str, content: str = "", is_binary: bool = False) -> dict:
     db = get_db()
     file_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     db.execute(
-        "INSERT INTO project_files (id, project_id, filename, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (file_id, project_id, filename, content, now, now),
+        "INSERT INTO project_files (id, project_id, filename, content, is_binary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (file_id, project_id, filename, content, 1 if is_binary else 0, now, now),
     )
     # Touch project updated_at
     db.execute("UPDATE projects SET updated_at = ? WHERE id = ?", (now, project_id))
@@ -213,7 +221,7 @@ def create_project_file(project_id: str, filename: str, content: str = "") -> di
 def list_project_files(project_id: str) -> list[dict]:
     db = get_db()
     rows = db.execute(
-        "SELECT id, filename, created_at, updated_at FROM project_files WHERE project_id = ? ORDER BY filename",
+        "SELECT id, filename, is_binary, created_at, updated_at FROM project_files WHERE project_id = ? ORDER BY filename",
         (project_id,),
     ).fetchall()
     db.close()

@@ -1,4 +1,4 @@
-import io, os, re, shutil, tempfile, zipfile, subprocess, pathlib, json, uuid, time
+import base64, io, os, re, shutil, tempfile, zipfile, subprocess, pathlib, json, uuid, time
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, HTMLResponse
@@ -583,8 +583,13 @@ async def api_render_project(project_id: str, request: Request):
             real_path = os.path.realpath(fpath)
             if not real_path.startswith(os.path.realpath(workdir)):
                 raise HTTPException(400, f"Invalid filename: {full_file['filename']}")
-            with open(fpath, "w", encoding="utf-8") as f:
-                f.write(full_file["content"])
+            if full_file.get("is_binary"):
+
+                with open(fpath, "wb") as f:
+                    f.write(base64.b64decode(full_file["content"]))
+            else:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    f.write(full_file["content"])
 
         main_file = project.get("main_file", "main.tex")
         entry = _detect_entrypoint(workdir, main_file)
@@ -623,14 +628,18 @@ async def api_upload_zip(project_id: str, request: Request, file: UploadFile = F
                 # Skip directories and hidden/system files
                 if member.endswith('/') or member.startswith('__MACOSX') or member.startswith('.'):
                     continue
-                # Read content as text (skip binary files)
+                raw = z.read(member)
+                # Try to store as text; fall back to base64 for binary files
                 try:
-                    content = z.read(member).decode('utf-8')
+                    content = raw.decode('utf-8')
+                    is_binary = False
                 except UnicodeDecodeError:
-                    continue
+    
+                    content = base64.b64encode(raw).decode('ascii')
+                    is_binary = True
                 # Normalize path: strip leading directory if all files share one
                 filename = member
-                create_project_file(project_id, filename, content)
+                create_project_file(project_id, filename, content, is_binary=is_binary)
     except zipfile.BadZipFile:
         raise HTTPException(400, "Invalid ZIP file")
 
@@ -659,7 +668,11 @@ async def api_download_zip(project_id: str, request: Request):
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
         for fmeta in files:
             full_file = get_project_file(fmeta["id"])
-            z.writestr(full_file["filename"], full_file["content"])
+            if full_file.get("is_binary"):
+
+                z.writestr(full_file["filename"], base64.b64decode(full_file["content"]))
+            else:
+                z.writestr(full_file["filename"], full_file["content"])
     buf.seek(0)
 
     safe_title = re.sub(r'[^\w\-. ]', '_', project["title"])
@@ -762,8 +775,13 @@ async def api_render_shared_project(link_id: str, request: Request):
             real_path = os.path.realpath(fpath)
             if not real_path.startswith(os.path.realpath(workdir)):
                 raise HTTPException(400, f"Invalid filename: {full_file['filename']}")
-            with open(fpath, "w", encoding="utf-8") as f:
-                f.write(full_file["content"])
+            if full_file.get("is_binary"):
+
+                with open(fpath, "wb") as f:
+                    f.write(base64.b64decode(full_file["content"]))
+            else:
+                with open(fpath, "w", encoding="utf-8") as f:
+                    f.write(full_file["content"])
 
         main_file = project.get("main_file", "main.tex")
         entry = _detect_entrypoint(workdir, main_file)

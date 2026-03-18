@@ -1907,6 +1907,9 @@ The quadratic formula is:
         }
 
         async function saveProject() {
+            // Don't save binary files
+            const activeMeta = activeFileId ? projectFiles.find(f => f.id === activeFileId) : null;
+            if (activeMeta && activeMeta.is_binary) return;
             if (activeFileId && isMultiFileMode()) {
                 // Save active file
                 const content = liveEditor.value;
@@ -2078,7 +2081,8 @@ The quadratic formula is:
                 const isActive = f.id === activeFileId;
                 const isMain = f.filename === mainFile;
                 const ext = f.filename.split('.').pop().toLowerCase();
-                const icon = ext === 'tex' ? '&#x1F4C4;' : ext === 'bib' ? '&#x1F4DA;' : ext === 'cls' || ext === 'sty' ? '&#x2699;' : '&#x1F4C3;';
+                const isBin = f.is_binary;
+                const icon = isBin ? '&#x1F5BC;' : ext === 'tex' ? '&#x1F4C4;' : ext === 'bib' ? '&#x1F4DA;' : ext === 'cls' || ext === 'sty' ? '&#x2699;' : '&#x1F4C3;';
                 return `
                     <li class="file-tree-item${isActive ? ' active' : ''}${isMain ? ' main-file' : ''}"
                         data-file-id="${f.id}" data-filename="${escHtml(f.filename)}"
@@ -2091,8 +2095,9 @@ The quadratic formula is:
         }
 
         async function openFile(fileId) {
-            // Save current file to cache
-            if (activeFileId && activeFileId !== fileId) {
+            // Save current file to cache (skip binary files)
+            const prevFile = activeFileId ? projectFiles.find(f => f.id === activeFileId) : null;
+            if (activeFileId && activeFileId !== fileId && !(prevFile && prevFile.is_binary)) {
                 fileContentsCache[activeFileId] = liveEditor.value;
                 // Auto-save previous file
                 if (liveEditor.value !== lastSavedSource) {
@@ -2138,10 +2143,17 @@ The quadratic formula is:
                 }
             }
 
-            // Update label
-            const fname = projectFiles.find(f => f.id === fileId)?.filename || 'Unknown';
+            // Update label and handle binary files
+            const fmeta = projectFiles.find(f => f.id === fileId);
+            const fname = fmeta?.filename || 'Unknown';
             document.getElementById('editorPanelLabel').textContent = fname;
-            liveEditor.focus();
+            if (fmeta && fmeta.is_binary) {
+                liveEditor.value = `[Binary file: ${fname}]\n\nThis file cannot be edited in the text editor.`;
+                liveEditor.readOnly = true;
+            } else {
+                if (currentProject) liveEditor.readOnly = false;
+                liveEditor.focus();
+            }
         }
 
         function startNewFile() {
