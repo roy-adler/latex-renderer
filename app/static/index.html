@@ -1463,7 +1463,27 @@
                 }
 
                 resetLivePreview();
+
+                // Load cached render if available (non-blocking)
+                loadCachedRender(projectId);
             } catch (e) { /* ignore */ }
+        }
+
+        async function loadCachedRender(projectId) {
+            try {
+                const res = await authFetch(`/api/projects/${projectId}/cached-render`);
+                if (res.status === 204 || !res.ok) return;
+                const data = await res.json();
+                if (data && data.pdf_base64) {
+                    const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
+                    synctexData = data.synctex || null;
+                    livePdfPlaceholder.style.display = 'none';
+                    liveErrorPanel.style.display = 'none';
+                    pdfViewerContainer.style.display = 'block';
+                    await renderPdfPages(pdfBytes);
+                    setLiveStatus('ready', 'Loaded from cache');
+                }
+            } catch (e) { /* ignore - no cache available */ }
         }
 
         async function confirmDeleteProject(projectId) {

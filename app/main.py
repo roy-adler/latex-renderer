@@ -16,6 +16,7 @@ from database import (
     create_project_file, list_project_files, get_project_file,
     get_project_file_by_name, update_project_file, delete_project_file,
     delete_all_project_files,
+    save_cached_render, get_cached_render,
 )
 from auth import hash_password, verify_password, create_token, get_current_user, require_user
 
@@ -761,9 +762,33 @@ async def api_render_project(project_id: str, request: Request):
             pdf_content = f.read()
         synctex_data = _parse_synctex(entry, workdir)
         pdf_b64 = base64.b64encode(pdf_content).decode('ascii')
+        # Cache the render for instant loading on next open
+        try:
+            save_cached_render(project_id, pdf_b64, json.dumps(synctex_data) if synctex_data else None)
+        except Exception:
+            pass  # Don't fail the render if caching fails
         return JSONResponse(content={"pdf_base64": pdf_b64, "synctex": synctex_data})
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
+
+# ─── Cached render ───
+
+@app.get("/api/projects/{project_id}/cached-render")
+async def api_get_cached_render(project_id: str, request: Request):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    cached = get_cached_render(project_id)
+    if not cached:
+        return JSONResponse(status_code=204, content=None)
+    synctex = None
+    if cached["synctex_json"]:
+        try:
+            synctex = json.loads(cached["synctex_json"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return JSONResponse(content={"pdf_base64": cached["pdf_base64"], "synctex": synctex})
 
 # ─── ZIP upload/download ───
 

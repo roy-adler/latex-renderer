@@ -38,6 +38,8 @@ def init_db():
             title TEXT NOT NULL DEFAULT 'Untitled Project',
             source TEXT NOT NULL DEFAULT '',
             main_file TEXT NOT NULL DEFAULT 'main.tex',
+            last_pdf_base64 TEXT,
+            last_synctex_json TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -66,6 +68,14 @@ def init_db():
         conn.execute("SELECT main_file FROM projects LIMIT 1")
     except sqlite3.OperationalError:
         conn.execute("ALTER TABLE projects ADD COLUMN main_file TEXT NOT NULL DEFAULT 'main.tex'")
+        conn.commit()
+
+    # Migration: add cached render columns if missing (existing databases)
+    try:
+        conn.execute("SELECT last_pdf_base64 FROM projects LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE projects ADD COLUMN last_pdf_base64 TEXT")
+        conn.execute("ALTER TABLE projects ADD COLUMN last_synctex_json TEXT")
         conn.commit()
 
     # Migration: add is_binary column if missing (existing databases)
@@ -155,7 +165,10 @@ def list_projects(user_id: str) -> list[dict]:
 
 def get_project(project_id: str) -> dict | None:
     db = get_db()
-    row = db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    row = db.execute(
+        "SELECT id, user_id, title, source, main_file, created_at, updated_at FROM projects WHERE id = ?",
+        (project_id,),
+    ).fetchone()
     db.close()
     return dict(row) if row else None
 
@@ -194,6 +207,26 @@ def update_project(project_id: str, title: str | None = None, source: str | None
     row = db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
     db.close()
     return dict(row)
+
+def save_cached_render(project_id: str, pdf_base64: str, synctex_json: str | None):
+    db = get_db()
+    db.execute(
+        "UPDATE projects SET last_pdf_base64 = ?, last_synctex_json = ? WHERE id = ?",
+        (pdf_base64, synctex_json, project_id),
+    )
+    db.commit()
+    db.close()
+
+def get_cached_render(project_id: str) -> dict | None:
+    db = get_db()
+    row = db.execute(
+        "SELECT last_pdf_base64, last_synctex_json FROM projects WHERE id = ?",
+        (project_id,),
+    ).fetchone()
+    db.close()
+    if not row or not row["last_pdf_base64"]:
+        return None
+    return {"pdf_base64": row["last_pdf_base64"], "synctex_json": row["last_synctex_json"]}
 
 def delete_project(project_id: str):
     db = get_db()
