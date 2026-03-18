@@ -181,19 +181,90 @@
             margin: 30px 0;
         }
 
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+        .progress-bar-container {
+            width: 100%;
+            max-width: 420px;
+            margin: 0 auto 18px;
+            background: #e9ecf5;
+            border-radius: 10px;
+            height: 18px;
+            overflow: hidden;
+            position: relative;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 10px;
+            transition: width 0.4s ease;
+        }
+
+        .progress-bar-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #fff;
+            mix-blend-mode: difference;
+        }
+
+        .progress-time {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 14px;
+        }
+
+        .progress-stage {
+            font-size: 0.95rem;
+            color: #444;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .progress-steps {
+            max-width: 420px;
+            margin: 0 auto;
+            text-align: left;
+        }
+
+        .progress-step {
+            margin: 6px 0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f3f9;
+            color: #999;
+            transition: all 0.3s ease;
+        }
+
+        .progress-step.active {
+            background: #f0edff;
+            color: #444;
+            border-left: 3px solid #667eea;
+            font-weight: 500;
+        }
+
+        .progress-step.done {
+            background: #edf9ee;
+            color: #38a169;
+            border-left: 3px solid #38a169;
+        }
+
+        .progress-step-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
         }
 
         .result {
@@ -940,21 +1011,24 @@
         </div>
 
         <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <div>Compiling your LaTeX project...</div>
-            <div style="font-size: 0.9rem; color: #666; margin-top: 10px;">This may take a few moments</div>
-            <div class="compilation-steps" style="margin-top: 20px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto;">
-                <div class="step" style="margin: 8px 0; padding: 8px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea;">
-                    <span class="step-icon">📦</span> Extracting ZIP file...
+            <div class="progress-stage" id="progressStage">Preparing...</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progressBarFill"></div>
+                <div class="progress-bar-label" id="progressBarLabel">0%</div>
+            </div>
+            <div class="progress-time" id="progressTime">Estimated time remaining: ~15s</div>
+            <div class="progress-steps">
+                <div class="progress-step" id="pStep0">
+                    <span class="progress-step-icon" id="pIcon0">📦</span> Extracting ZIP file
                 </div>
-                <div class="step" style="margin: 8px 0; padding: 8px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea;">
-                    <span class="step-icon">🔍</span> Detecting LaTeX entry point...
+                <div class="progress-step" id="pStep1">
+                    <span class="progress-step-icon" id="pIcon1">🔍</span> Detecting LaTeX entry point
                 </div>
-                <div class="step" style="margin: 8px 0; padding: 8px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea;">
-                    <span class="step-icon">⚙️</span> Running latexmk compilation...
+                <div class="progress-step" id="pStep2">
+                    <span class="progress-step-icon" id="pIcon2">⚙️</span> Compiling with latexmk
                 </div>
-                <div class="step" style="margin: 8px 0; padding: 8px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea;">
-                    <span class="step-icon">📄</span> Generating PDF...
+                <div class="progress-step" id="pStep3">
+                    <span class="progress-step-icon" id="pIcon3">📄</span> Generating PDF
                 </div>
             </div>
         </div>
@@ -1494,6 +1568,103 @@
             uploadFile(file);
         }
 
+        /* ── Progress bar controller ── */
+        const PROGRESS_STAGES = [
+            { icon: '📦', doneIcon: '✅', pct: 10,  label: 'Extracting ZIP file' },
+            { icon: '🔍', doneIcon: '✅', pct: 20,  label: 'Detecting LaTeX entry point' },
+            { icon: '⚙️', doneIcon: '✅', pct: 85,  label: 'Compiling with latexmk' },
+            { icon: '📄', doneIcon: '✅', pct: 100, label: 'Generating PDF' },
+        ];
+        let progressTimer = null;
+        let progressStart = 0;
+        const ESTIMATED_SECONDS = 15;
+
+        function startProgress() {
+            progressStart = Date.now();
+            setProgressUI(0, -1);
+            progressTimer = setInterval(tickProgress, 300);
+        }
+
+        function tickProgress() {
+            const elapsed = (Date.now() - progressStart) / 1000;
+            // Ease-out curve: fast at start, slows approaching 95%
+            const ratio = Math.min(elapsed / ESTIMATED_SECONDS, 1);
+            const pct = Math.min(95, Math.round(ratio * 100 * (1 - 0.3 * ratio)));
+
+            // Determine current stage based on which threshold we've passed
+            let stageIdx = 0;
+            for (let i = PROGRESS_STAGES.length - 1; i >= 0; i--) {
+                if (pct >= (i === 0 ? 0 : PROGRESS_STAGES[i - 1].pct)) { stageIdx = i; break; }
+            }
+
+            setProgressUI(pct, stageIdx);
+
+            const remaining = Math.max(0, Math.round(ESTIMATED_SECONDS - elapsed));
+            const timeEl = document.getElementById('progressTime');
+            if (remaining > 0) {
+                timeEl.textContent = `Estimated time remaining: ~${remaining}s`;
+            } else {
+                timeEl.textContent = 'Almost done, finalizing...';
+            }
+        }
+
+        function setProgressUI(pct, activeStageIdx) {
+            document.getElementById('progressBarFill').style.width = pct + '%';
+            document.getElementById('progressBarLabel').textContent = pct + '%';
+
+            const stageEl = document.getElementById('progressStage');
+            if (activeStageIdx >= 0 && activeStageIdx < PROGRESS_STAGES.length) {
+                stageEl.textContent = PROGRESS_STAGES[activeStageIdx].label + '...';
+            } else {
+                stageEl.textContent = 'Preparing...';
+            }
+
+            for (let i = 0; i < PROGRESS_STAGES.length; i++) {
+                const step = document.getElementById('pStep' + i);
+                const icon = document.getElementById('pIcon' + i);
+                step.classList.remove('active', 'done');
+                if (i < activeStageIdx) {
+                    step.classList.add('done');
+                    icon.textContent = PROGRESS_STAGES[i].doneIcon;
+                } else if (i === activeStageIdx) {
+                    step.classList.add('active');
+                    icon.textContent = PROGRESS_STAGES[i].icon;
+                } else {
+                    icon.textContent = PROGRESS_STAGES[i].icon;
+                }
+            }
+        }
+
+        function finishProgress() {
+            clearInterval(progressTimer);
+            progressTimer = null;
+            setProgressUI(100, PROGRESS_STAGES.length);
+            // Mark all as done
+            for (let i = 0; i < PROGRESS_STAGES.length; i++) {
+                const step = document.getElementById('pStep' + i);
+                const icon = document.getElementById('pIcon' + i);
+                step.classList.remove('active');
+                step.classList.add('done');
+                icon.textContent = PROGRESS_STAGES[i].doneIcon;
+            }
+            document.getElementById('progressStage').textContent = 'Done!';
+            document.getElementById('progressTime').textContent = '';
+        }
+
+        function resetProgress() {
+            clearInterval(progressTimer);
+            progressTimer = null;
+            setProgressUI(0, -1);
+            document.getElementById('progressTime').textContent = '';
+            // Reset icons
+            for (let i = 0; i < PROGRESS_STAGES.length; i++) {
+                const step = document.getElementById('pStep' + i);
+                const icon = document.getElementById('pIcon' + i);
+                step.classList.remove('active', 'done');
+                icon.textContent = PROGRESS_STAGES[i].icon;
+            }
+        }
+
         async function uploadFile(file) {
             const formData = new FormData();
             formData.append('project', file);
@@ -1506,9 +1677,11 @@
             uploadHint.textContent = 'Please wait while we process your LaTeX project';
             fileInput.value = '';
             fileSelected.style.display = 'none';
+            startProgress();
 
             try {
                 const response = await fetch('/render', { method: 'POST', body: formData });
+                finishProgress();
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
@@ -1530,6 +1703,7 @@
             } catch (error) {
                 showError('Network error occurred while processing your file. Please check your connection and try again.');
             } finally {
+                resetProgress();
                 loading.style.display = 'none';
             }
         }
@@ -1594,6 +1768,7 @@
             uploadText.textContent = 'Drag & drop your ZIP file here';
             uploadHint.textContent = 'or click to browse';
             fileInput.value = '';
+            resetProgress();
         }
 
         /* ═══════════════════════════════════════
