@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 -c \"import py_compile; py_compile.compile\\(''app/main.py'', doraise=True\\); print\\(''OK''\\)\")"
+      "Bash(python3 -c \"import py_compile; py_compile.compile\\(''app/main.py'', doraise=True\\); print\\(''OK''\\)\")",
+      "Bash(python3 -c \":*)"
     ]
   }
 }

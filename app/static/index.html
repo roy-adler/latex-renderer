@@ -653,6 +653,7 @@
             flex-direction: column;
             min-width: 100px;
             flex: 0 0 50%;
+            position: relative;
         }
 
         .live-divider {
@@ -1194,6 +1195,13 @@
             <div class="live-editor-panel">
                 <div class="live-panel-label" id="editorPanelLabel">LaTeX Source</div>
                 <textarea id="liveEditor" spellcheck="false"></textarea>
+                <div id="imagePreviewOverlay" style="display:none; position:absolute; top:28px; left:0; right:0; bottom:0; background:#1a1a2e; overflow:auto; z-index:5;">
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100%; padding:24px;">
+                        <img id="imagePreviewImg" style="max-width:100%; max-height:80vh; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.4);">
+                        <div id="imagePreviewName" style="color:#aaa; margin-top:12px; font-size:0.85rem;"></div>
+                        <div id="imagePreviewSize" style="color:#666; margin-top:4px; font-size:0.75rem;"></div>
+                    </div>
+                </div>
             </div>
             <div class="live-divider" id="liveDivider"></div>
             <div class="live-pdf-panel" id="livePdfPanel">
@@ -2480,10 +2488,32 @@ The quadratic formula is:
             const fname = fmeta?.filename || 'Unknown';
             const displayName = fname.includes('/') ? fname.split('/').pop() : fname;
             document.getElementById('editorPanelLabel').textContent = displayName;
+            const overlay = document.getElementById('imagePreviewOverlay');
             if (fmeta && fmeta.is_binary) {
-                liveEditor.value = `[Binary file: ${displayName}]\n\nThis file cannot be edited in the text editor.`;
+                const ext = displayName.split('.').pop().toLowerCase();
+                const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'webp'];
+                if (imageExts.includes(ext)) {
+                    // Show image preview
+                    const mimeMap = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', bmp:'image/bmp', svg:'image/svg+xml', webp:'image/webp'};
+                    const mime = mimeMap[ext] || 'image/png';
+                    const content = fileContentsCache[fileId];
+                    document.getElementById('imagePreviewImg').src = `data:${mime};base64,${content}`;
+                    document.getElementById('imagePreviewName').textContent = displayName;
+                    // Estimate file size from base64 length
+                    const sizeBytes = Math.round((content || '').length * 3 / 4);
+                    const sizeStr = sizeBytes > 1024*1024 ? (sizeBytes/1024/1024).toFixed(1)+' MB' : sizeBytes > 1024 ? (sizeBytes/1024).toFixed(1)+' KB' : sizeBytes+' B';
+                    document.getElementById('imagePreviewSize').textContent = sizeStr;
+                    overlay.style.display = 'block';
+                    liveEditor.style.display = 'none';
+                } else {
+                    overlay.style.display = 'none';
+                    liveEditor.style.display = '';
+                    liveEditor.value = `[Binary file: ${displayName}]\n\nThis file cannot be edited in the text editor.`;
+                }
                 liveEditor.readOnly = true;
             } else {
+                overlay.style.display = 'none';
+                liveEditor.style.display = '';
                 if (currentProject) liveEditor.readOnly = false;
                 liveEditor.focus();
             }
