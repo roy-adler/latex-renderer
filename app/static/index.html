@@ -1430,42 +1430,76 @@
            Routing / Views
            ═══════════════════════════════════════ */
         function showHome() {
-            document.getElementById('mainContainer').style.display = '';
-            document.getElementById('projectDashboard').classList.remove('active');
             window.location.hash = '#/';
         }
 
         function showDashboard() {
             if (!auth.isLoggedIn()) { showAuthModal('login'); return; }
-            document.getElementById('mainContainer').style.display = 'none';
-            document.getElementById('projectDashboard').classList.add('active');
             window.location.hash = '#/projects';
-            loadProjects();
+        }
+
+        // Close the live mode overlay without changing the hash (used by the router)
+        function closeLiveModeQuiet() {
+            if (!document.getElementById('liveModeContainer').classList.contains('active')) return;
+            if (activeFileId && isMultiFileMode()) {
+                fileContentsCache[activeFileId] = liveEditor.value;
+            }
+            if (currentProject && liveEditor.value !== lastSavedSource) {
+                if (confirm('You have unsaved changes. Save before exiting?')) {
+                    saveProject();
+                }
+            }
+            document.getElementById('liveModeContainer').classList.remove('active');
+            document.body.style.overflow = '';
+            clearInterval(autoSaveTimer);
+            currentProject = null;
+            currentShareLink = null;
+            projectFiles = [];
+            activeFileId = null;
+            fileContentsCache = {};
+            expandedFolders = new Set();
+            showFileTree(false);
         }
 
         async function router() {
             const hash = window.location.hash || '#/';
+
             if (hash.startsWith('#/shared/')) {
+                closeLiveModeQuiet();
                 const linkId = hash.slice(9);
+                document.getElementById('mainContainer').style.display = 'none';
+                document.getElementById('projectDashboard').classList.remove('active');
                 await openSharedProject(linkId);
+
             } else if (hash.startsWith('#/projects/')) {
-                // Direct project link: #/projects/{id}
                 const projectId = hash.slice(11);
                 if (auth.isLoggedIn() && projectId) {
-                    // Only open if not already viewing this project
                     if (!currentProject || currentProject.id !== projectId) {
+                        closeLiveModeQuiet();
                         document.getElementById('mainContainer').style.display = 'none';
                         document.getElementById('projectDashboard').classList.remove('active');
                         await openProject(projectId);
                     }
                 } else {
-                    showHome();
+                    closeLiveModeQuiet();
+                    document.getElementById('mainContainer').style.display = '';
+                    document.getElementById('projectDashboard').classList.remove('active');
                 }
+
             } else if (hash === '#/projects') {
-                if (auth.isLoggedIn()) showDashboard();
-                else showHome();
+                closeLiveModeQuiet();
+                if (auth.isLoggedIn()) {
+                    document.getElementById('mainContainer').style.display = 'none';
+                    document.getElementById('projectDashboard').classList.add('active');
+                    loadProjects();
+                } else {
+                    document.getElementById('mainContainer').style.display = '';
+                    document.getElementById('projectDashboard').classList.remove('active');
+                }
+
             } else {
-                // default: home
+                // #/ — home
+                closeLiveModeQuiet();
                 document.getElementById('mainContainer').style.display = '';
                 document.getElementById('projectDashboard').classList.remove('active');
             }
@@ -1493,7 +1527,7 @@
                             <div class="project-card-date">Updated ${new Date(p.updated_at).toLocaleString()}</div>
                         </div>
                         <div class="project-card-actions">
-                            <button class="btn btn-sm" onclick="openProject('${p.id}')">Open</button>
+                            <button class="btn btn-sm" onclick="window.location.hash='#/projects/${p.id}'">Open</button>
                             <button class="btn btn-sm" style="background:#38a169;" onclick="downloadProjectZipById('${p.id}', '${escHtml(p.title)}')">Download</button>
                             <button class="btn btn-sm" style="background:#0ea5e9;" onclick="openShareModal('${p.id}', '${escHtml(p.title)}')">Share</button>
                             <button class="btn btn-sm" style="background:#e53e3e;" onclick="confirmDeleteProject('${p.id}')">Delete</button>
@@ -1512,7 +1546,7 @@
                     body: JSON.stringify({ title: 'Untitled Project', source: DEFAULT_TEX }),
                 });
                 const project = await res.json();
-                openProject(project.id);
+                window.location.hash = '#/projects/' + project.id;
             } catch (e) { /* ignore */ }
         }
 
@@ -1532,7 +1566,6 @@
                 document.getElementById('liveSaveBtn').style.display = '';
                 document.getElementById('liveModeContainer').classList.add('active');
                 document.body.style.overflow = 'hidden';
-                window.location.hash = '#/projects/' + projectId;
 
                 // Load file tree
                 projectFiles = project.files || [];
@@ -2069,36 +2102,12 @@ The quadratic formula is:
         }
 
         function exitLiveMode() {
-            // Save current file content to cache before checking
-            if (activeFileId && isMultiFileMode()) {
-                fileContentsCache[activeFileId] = liveEditor.value;
-            }
-            // Prompt save if project has unsaved changes
-            if (currentProject && liveEditor.value !== lastSavedSource) {
-                if (confirm('You have unsaved changes. Save before exiting?')) {
-                    saveProject();
-                }
-            }
-            const wasProject = !!currentProject;
-            document.getElementById('liveModeContainer').classList.remove('active');
-            document.body.style.overflow = '';
-            clearInterval(autoSaveTimer);
-            currentProject = null;
-            currentShareLink = null;
-            projectFiles = [];
-            activeFileId = null;
-            fileContentsCache = {};
-            expandedFolders = new Set();
-            showFileTree(false);
-            // Navigate back appropriately
-            if (window.location.hash.startsWith('#/shared/')) {
-                window.location.hash = '#/';
-            } else if (window.location.hash.startsWith('#/projects/')) {
+            // Navigate via hash — the router handles cleanup
+            if (window.location.hash.startsWith('#/shared/') || window.location.hash.startsWith('#/projects/')) {
                 window.location.hash = '#/projects';
-            }
-            // Refresh dashboard if returning from a project
-            if (wasProject && document.getElementById('projectDashboard').classList.contains('active')) {
-                loadProjects();
+            } else {
+                // Non-project live mode (from home page)
+                closeLiveModeQuiet();
             }
         }
 
