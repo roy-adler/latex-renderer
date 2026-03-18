@@ -584,7 +584,6 @@ async def api_render_project(project_id: str, request: Request):
             if not real_path.startswith(os.path.realpath(workdir)):
                 raise HTTPException(400, f"Invalid filename: {full_file['filename']}")
             if full_file.get("is_binary"):
-
                 with open(fpath, "wb") as f:
                     f.write(base64.b64decode(full_file["content"]))
             else:
@@ -634,7 +633,6 @@ async def api_upload_zip(project_id: str, request: Request, file: UploadFile = F
                     content = raw.decode('utf-8')
                     is_binary = False
                 except UnicodeDecodeError:
-    
                     content = base64.b64encode(raw).decode('ascii')
                     is_binary = True
                 # Normalize path: strip leading directory if all files share one
@@ -669,7 +667,6 @@ async def api_download_zip(project_id: str, request: Request):
         for fmeta in files:
             full_file = get_project_file(fmeta["id"])
             if full_file.get("is_binary"):
-
                 z.writestr(full_file["filename"], base64.b64decode(full_file["content"]))
             else:
                 z.writestr(full_file["filename"], full_file["content"])
@@ -776,7 +773,6 @@ async def api_render_shared_project(link_id: str, request: Request):
             if not real_path.startswith(os.path.realpath(workdir)):
                 raise HTTPException(400, f"Invalid filename: {full_file['filename']}")
             if full_file.get("is_binary"):
-
                 with open(fpath, "wb") as f:
                     f.write(base64.b64decode(full_file["content"]))
             else:
