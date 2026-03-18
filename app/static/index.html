@@ -1429,16 +1429,21 @@
         /* ═══════════════════════════════════════
            Routing / Views
            ═══════════════════════════════════════ */
+        function navigateTo(path) {
+            history.pushState(null, '', path);
+            router();
+        }
+
         function showHome() {
-            window.location.hash = '#/';
+            navigateTo('/');
         }
 
         function showDashboard() {
             if (!auth.isLoggedIn()) { showAuthModal('login'); return; }
-            window.location.hash = '#/projects';
+            navigateTo('/projects');
         }
 
-        // Close the live mode overlay without changing the hash (used by the router)
+        // Close the live mode overlay without changing the URL (used by the router)
         function closeLiveModeQuiet() {
             if (!document.getElementById('liveModeContainer').classList.contains('active')) return;
             if (activeFileId && isMultiFileMode()) {
@@ -1462,17 +1467,17 @@
         }
 
         async function router() {
-            const hash = window.location.hash || '#/';
+            const path = window.location.pathname;
 
-            if (hash.startsWith('#/shared/')) {
+            if (path.startsWith('/shared/')) {
                 closeLiveModeQuiet();
-                const linkId = hash.slice(9);
+                const linkId = path.slice(8);
                 document.getElementById('mainContainer').style.display = 'none';
                 document.getElementById('projectDashboard').classList.remove('active');
                 await openSharedProject(linkId);
 
-            } else if (hash.startsWith('#/projects/')) {
-                const projectId = hash.slice(11);
+            } else if (path.startsWith('/projects/')) {
+                const projectId = path.slice(10);
                 if (auth.isLoggedIn() && projectId) {
                     if (!currentProject || currentProject.id !== projectId) {
                         closeLiveModeQuiet();
@@ -1486,7 +1491,7 @@
                     document.getElementById('projectDashboard').classList.remove('active');
                 }
 
-            } else if (hash === '#/projects') {
+            } else if (path === '/projects') {
                 closeLiveModeQuiet();
                 if (auth.isLoggedIn()) {
                     document.getElementById('mainContainer').style.display = 'none';
@@ -1498,14 +1503,14 @@
                 }
 
             } else {
-                // #/ — home
+                // / — home
                 closeLiveModeQuiet();
                 document.getElementById('mainContainer').style.display = '';
                 document.getElementById('projectDashboard').classList.remove('active');
             }
         }
 
-        window.addEventListener('hashchange', router);
+        window.addEventListener('popstate', router);
 
         /* ═══════════════════════════════════════
            Project Dashboard
@@ -1527,7 +1532,7 @@
                             <div class="project-card-date">Updated ${new Date(p.updated_at).toLocaleString()}</div>
                         </div>
                         <div class="project-card-actions">
-                            <button class="btn btn-sm" onclick="window.location.hash='#/projects/${p.id}'">Open</button>
+                            <button class="btn btn-sm" onclick="navigateTo('/projects/${p.id}')">Open</button>
                             <button class="btn btn-sm" style="background:#38a169;" onclick="downloadProjectZipById('${p.id}', '${escHtml(p.title)}')">Download</button>
                             <button class="btn btn-sm" style="background:#0ea5e9;" onclick="openShareModal('${p.id}', '${escHtml(p.title)}')">Share</button>
                             <button class="btn btn-sm" style="background:#e53e3e;" onclick="confirmDeleteProject('${p.id}')">Delete</button>
@@ -1546,7 +1551,7 @@
                     body: JSON.stringify({ title: 'Untitled Project', source: DEFAULT_TEX }),
                 });
                 const project = await res.json();
-                window.location.hash = '#/projects/' + project.id;
+                navigateTo('/projects/' + project.id);
             } catch (e) { /* ignore */ }
         }
 
@@ -1687,7 +1692,7 @@
                     return;
                 }
                 container.innerHTML = links.map(l => {
-                    const url = `${location.origin}/#/shared/${l.id}`;
+                    const url = `${location.origin}/shared/${l.id}`;
                     return `
                         <div class="share-link-row">
                             <span class="share-link-badge ${l.access_level}">${l.access_level}</span>
@@ -2102,11 +2107,10 @@ The quadratic formula is:
         }
 
         function exitLiveMode() {
-            // Navigate via hash — the router handles cleanup
-            if (window.location.hash.startsWith('#/shared/') || window.location.hash.startsWith('#/projects/')) {
-                window.location.hash = '#/projects';
+            const path = window.location.pathname;
+            if (path.startsWith('/shared/') || path.startsWith('/projects/')) {
+                navigateTo('/projects');
             } else {
-                // Non-project live mode (from home page)
                 closeLiveModeQuiet();
             }
         }

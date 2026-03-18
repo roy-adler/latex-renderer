@@ -43,18 +43,31 @@ async def health_check():
 @app.get("/")
 async def root():
     """Serve the web interface."""
-    try:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        html_path = os.path.join(script_dir, "static", "index.html")
-        with open(html_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        return {"service": "LaTeX Render API", "version": "1.0.0"}
+    return HTMLResponse(content=_get_index_html())
 
 
 @app.get("/api")
 async def api_info():
     return {"service": "LaTeX Render API", "version": "1.0.0"}
+
+
+# ─── SPA catch-all: serve index.html for frontend routes ───
+
+_html_cache = None
+
+def _get_index_html():
+    global _html_cache
+    if _html_cache is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(script_dir, "static", "index.html"), "r", encoding="utf-8") as f:
+            _html_cache = f.read()
+    return _html_cache
+
+@app.get("/projects")
+@app.get("/projects/{path:path}")
+@app.get("/shared/{path:path}")
+async def spa_catch_all(path: str = ""):
+    return HTMLResponse(content=_get_index_html())
 
 
 # ─── Static files ───
