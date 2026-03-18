@@ -966,7 +966,11 @@
     <div class="dashboard" id="projectDashboard">
         <div class="dashboard-header">
             <h2>My Projects</h2>
-            <button class="btn btn-sm" onclick="createNewProject()">+ New Project</button>
+            <div style="display:flex; gap:8px;">
+                <button class="btn btn-sm" onclick="createNewProject()">+ New Project</button>
+                <button class="btn btn-sm" style="background:#0ea5e9;" onclick="document.getElementById('dashboardZipInput').click()">Upload ZIP</button>
+                <input type="file" id="dashboardZipInput" accept=".zip" style="display:none;">
+            </div>
         </div>
         <ul class="project-list" id="projectList"></ul>
         <div style="text-align:center; margin-top:16px;">
@@ -1243,6 +1247,7 @@
                         </div>
                         <div class="project-card-actions">
                             <button class="btn btn-sm" onclick="openProject('${p.id}')">Open</button>
+                            <button class="btn btn-sm" style="background:#38a169;" onclick="downloadProjectZipById('${p.id}', '${escHtml(p.title)}')">Download</button>
                             <button class="btn btn-sm" style="background:#0ea5e9;" onclick="openShareModal('${p.id}', '${escHtml(p.title)}')">Share</button>
                             <button class="btn btn-sm" style="background:#e53e3e;" onclick="confirmDeleteProject('${p.id}')">Delete</button>
                         </div>
@@ -2182,6 +2187,65 @@ The quadratic formula is:
                 }
             } catch(e) { /* ignore */ }
         }
+
+        /* ═══════════════════════════════════════
+           Dashboard ZIP Upload / Download
+           ═══════════════════════════════════════ */
+        async function downloadProjectZipById(projectId, title) {
+            try {
+                const res = await authFetch(`/api/projects/${projectId}/download-zip`);
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = (title || 'project') + '.zip';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            } catch(e) { /* ignore */ }
+        }
+
+        document.getElementById('dashboardZipInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            e.target.value = '';
+
+            // Derive project title from ZIP filename (strip .zip extension)
+            const title = file.name.replace(/\.zip$/i, '') || 'Uploaded Project';
+
+            try {
+                // Create a new project
+                const createRes = await authFetch('/api/projects', {
+                    method: 'POST',
+                    body: JSON.stringify({ title, source: '' }),
+                });
+                if (!createRes.ok) {
+                    alert('Failed to create project');
+                    return;
+                }
+                const project = await createRes.json();
+
+                // Upload the ZIP into the new project
+                const formData = new FormData();
+                formData.append('file', file);
+                const uploadRes = await authFetch(`/api/projects/${project.id}/upload-zip`, {
+                    method: 'POST',
+                    headers: {},
+                    body: formData,
+                });
+                if (!uploadRes.ok) {
+                    const err = await uploadRes.json();
+                    alert(err.detail || 'ZIP upload failed');
+                    return;
+                }
+
+                // Refresh the project list
+                loadProjects();
+            } catch(e) {
+                alert('Upload failed: ' + e.message);
+            }
+        });
 
         /* ═══════════════════════════════════════
            Editable Project Title
