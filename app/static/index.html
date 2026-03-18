@@ -667,6 +667,247 @@
             white-space: pre-wrap;
             background: #1a0a0a;
         }
+
+        /* ── File Tree Panel ── */
+        .live-file-tree {
+            width: 220px;
+            min-width: 140px;
+            max-width: 400px;
+            background: #16162a;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #2a2a3a;
+            flex-shrink: 0;
+        }
+
+        .file-tree-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid #2a2a3a;
+            gap: 4px;
+        }
+
+        .file-tree-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+            flex: 1;
+        }
+
+        .file-tree-actions {
+            display: flex;
+            gap: 2px;
+        }
+
+        .file-tree-action {
+            background: transparent;
+            border: 1px solid #333;
+            color: #888;
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            padding: 0;
+        }
+
+        .file-tree-action:hover {
+            background: #2a2a3a;
+            color: #ccc;
+            border-color: #555;
+        }
+
+        .file-tree-list {
+            list-style: none;
+            overflow-y: auto;
+            flex: 1;
+            padding: 4px 0;
+        }
+
+        .file-tree-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            cursor: pointer;
+            color: #aaa;
+            font-size: 0.82rem;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            transition: background 0.1s;
+            gap: 6px;
+            position: relative;
+        }
+
+        .file-tree-item:hover {
+            background: #1e1e35;
+            color: #ccc;
+        }
+
+        .file-tree-item.active {
+            background: #252545;
+            color: #f5f5f5;
+            border-left: 2px solid #667eea;
+            padding-left: 10px;
+        }
+
+        .file-tree-item.main-file .file-tree-icon::after {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #4ade80;
+            border-radius: 50%;
+            top: 2px;
+            right: -2px;
+        }
+
+        .file-tree-icon {
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .file-tree-name {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-tree-item-actions {
+            display: none;
+            gap: 2px;
+        }
+
+        .file-tree-item:hover .file-tree-item-actions {
+            display: flex;
+        }
+
+        .file-tree-item-btn {
+            background: transparent;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .file-tree-item-btn:hover {
+            background: #333;
+            color: #f87171;
+        }
+
+        .file-tree-rename-input {
+            background: #1e1e2e;
+            border: 1px solid #667eea;
+            color: #cdd6f4;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.82rem;
+            padding: 2px 4px;
+            border-radius: 3px;
+            outline: none;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-tree-new-input {
+            margin: 4px 8px;
+            background: #1e1e2e;
+            border: 1px solid #667eea;
+            color: #cdd6f4;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.82rem;
+            padding: 6px 8px;
+            border-radius: 4px;
+            outline: none;
+            width: calc(100% - 16px);
+        }
+
+        /* context menu */
+        .file-context-menu {
+            position: fixed;
+            z-index: 3000;
+            background: #1e1e2e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 4px 0;
+            min-width: 160px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            display: none;
+        }
+
+        .file-context-menu.active {
+            display: block;
+        }
+
+        .file-context-item {
+            padding: 8px 16px;
+            color: #ccc;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .file-context-item:hover {
+            background: #252545;
+        }
+
+        .file-context-item.danger {
+            color: #f87171;
+        }
+
+        .file-context-item.danger:hover {
+            background: #3a1a1a;
+        }
+
+        /* ── Editable Title ── */
+        .live-header-title.editable {
+            cursor: pointer;
+        }
+
+        .live-header-title.editable:hover {
+            text-decoration: underline;
+            text-decoration-style: dashed;
+            text-underline-offset: 4px;
+            text-decoration-color: #555;
+        }
+
+        .live-header-title-input {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #f5f5f5;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #667eea;
+            outline: none;
+            font-family: inherit;
+            padding: 0 0 2px 0;
+            min-width: 100px;
+            max-width: 400px;
+        }
+
+        /* ── Tree Divider ── */
+        .live-tree-divider {
+            width: 4px;
+            cursor: col-resize;
+            background: #2a2a3a;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+
+        .live-tree-divider:hover,
+        .live-tree-divider.dragging {
+            background: #667eea;
+        }
     </style>
 </head>
 <body>
@@ -777,17 +1018,30 @@
     <!-- ── Live Mode Container ── -->
     <div id="liveModeContainer">
         <div class="live-header">
-            <span class="live-header-title" id="liveHeaderTitle">✏️ LaTeX Live Mode</span>
+            <span class="live-header-title" id="liveHeaderTitle">LaTeX Live Mode</span>
             <span class="live-status ready" id="liveStatus">Ready</span>
             <div class="live-header-actions">
                 <button class="btn-save" id="liveSaveBtn" style="display:none;" onclick="saveProject()">Save</button>
-                <button class="btn-render-now" onclick="liveRender()">▶ Render Now</button>
-                <button class="btn-exit" onclick="exitLiveMode()">✕ Exit</button>
+                <button class="btn-render-now" onclick="liveRender()">Render Now</button>
+                <button class="btn-exit" onclick="exitLiveMode()">Exit</button>
             </div>
         </div>
         <div class="live-body">
+            <div class="live-file-tree" id="liveFileTree" style="display:none;">
+                <div class="file-tree-header">
+                    <span class="file-tree-title">Files</span>
+                    <div class="file-tree-actions">
+                        <button class="file-tree-action" onclick="startNewFile()" title="New File">+</button>
+                        <button class="file-tree-action" onclick="triggerZipUpload()" title="Upload ZIP">&#8593;</button>
+                        <button class="file-tree-action" onclick="downloadProjectZip()" title="Download ZIP">&#8595;</button>
+                    </div>
+                </div>
+                <ul class="file-tree-list" id="fileTreeList"></ul>
+                <input type="file" id="zipUploadInput" accept=".zip" style="display:none" />
+            </div>
+            <div class="live-tree-divider" id="liveTreeDivider" style="display:none;"></div>
             <div class="live-editor-panel">
-                <div class="live-panel-label">LaTeX Source</div>
+                <div class="live-panel-label" id="editorPanelLabel">LaTeX Source</div>
                 <textarea id="liveEditor" spellcheck="false"></textarea>
             </div>
             <div class="live-divider" id="liveDivider"></div>
@@ -801,6 +1055,13 @@
                 <div class="live-error-panel" id="liveErrorPanel" style="display:none;"></div>
             </div>
         </div>
+    </div>
+
+    <!-- ── File Context Menu ── -->
+    <div class="file-context-menu" id="fileContextMenu">
+        <div class="file-context-item" onclick="contextRenameFile()">Rename</div>
+        <div class="file-context-item" onclick="contextSetMainFile()">Set as Main File</div>
+        <div class="file-context-item danger" onclick="contextDeleteFile()">Delete</div>
     </div>
 
     <script>
@@ -834,7 +1095,14 @@
         };
 
         async function authFetch(url, options = {}) {
-            options.headers = { ...options.headers, ...auth.headers() };
+            const headers = options.headers || {};
+            // Add auth token
+            if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`;
+            // Only set Content-Type for non-FormData bodies
+            if (!(options.body instanceof FormData)) {
+                headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+            }
+            options.headers = headers;
             const res = await fetch(url, options);
             if (res.status === 401) {
                 auth.logout();
@@ -1003,13 +1271,36 @@
                 const project = await res.json();
                 currentProject = project;
                 currentShareLink = null;
-                liveEditor.value = project.source || DEFAULT_TEX;
+                fileContentsCache = {};
                 liveEditor.readOnly = false;
-                document.getElementById('liveHeaderTitle').textContent = project.title;
+                const titleEl = document.getElementById('liveHeaderTitle');
+                titleEl.textContent = project.title;
+                titleEl.classList.add('editable');
                 document.getElementById('liveSaveBtn').style.display = '';
                 document.getElementById('liveModeContainer').classList.add('active');
                 document.body.style.overflow = 'hidden';
-                liveEditor.focus();
+
+                // Load file tree
+                projectFiles = project.files || [];
+                if (projectFiles.length > 0) {
+                    showFileTree(true);
+                    document.querySelector('.file-tree-actions').style.display = '';
+                    renderFileTree();
+                    // Open main file
+                    const mainFile = project.main_file || 'main.tex';
+                    const mainF = projectFiles.find(f => f.filename === mainFile);
+                    if (mainF) {
+                        await openFile(mainF.id);
+                    } else {
+                        await openFile(projectFiles[0].id);
+                    }
+                } else {
+                    // Fallback to legacy single-file mode
+                    showFileTree(false);
+                    liveEditor.value = project.source || DEFAULT_TEX;
+                    document.getElementById('editorPanelLabel').textContent = 'LaTeX Source';
+                }
+
                 resetLivePreview();
             } catch (e) { /* ignore */ }
         }
@@ -1112,15 +1403,37 @@
                 }
                 const data = await res.json();
                 currentProject = null;
-                currentShareLink = { id: linkId, access_level: data.access_level };
-                liveEditor.value = data.project.source || '';
+                currentShareLink = { id: linkId, access_level: data.access_level, project_id: data.project.id };
+                fileContentsCache = {};
                 liveEditor.readOnly = data.access_level === 'readonly';
                 const titleSuffix = data.access_level === 'readonly' ? ' (readonly)' : ' (contributor)';
-                document.getElementById('liveHeaderTitle').textContent = data.project.title + titleSuffix;
+                const titleEl = document.getElementById('liveHeaderTitle');
+                titleEl.textContent = data.project.title + titleSuffix;
+                titleEl.classList.remove('editable');
                 document.getElementById('liveSaveBtn').style.display = data.access_level === 'contributor' ? '' : 'none';
                 document.getElementById('liveModeContainer').classList.add('active');
                 document.body.style.overflow = 'hidden';
-                liveEditor.focus();
+
+                // Load file tree for shared projects
+                projectFiles = data.files || [];
+                if (projectFiles.length > 0) {
+                    showFileTree(true);
+                    // Hide file management actions for shared projects
+                    document.querySelector('.file-tree-actions').style.display = 'none';
+                    renderFileTree();
+                    const mainFile = data.project.main_file || 'main.tex';
+                    const mainF = projectFiles.find(f => f.filename === mainFile);
+                    if (mainF) {
+                        await openFile(mainF.id);
+                    } else {
+                        await openFile(projectFiles[0].id);
+                    }
+                } else {
+                    showFileTree(false);
+                    liveEditor.value = data.project.source || '';
+                    document.getElementById('editorPanelLabel').textContent = 'LaTeX Source';
+                }
+
                 resetLivePreview();
             } catch (e) {
                 alert('Failed to load shared project.');
@@ -1323,12 +1636,33 @@ The quadratic formula is:
         let autoSaveTimer     = null;
         let lastSavedSource   = '';
 
+        // Multi-file state
+        let projectFiles = [];        // [{id, filename, updated_at}]
+        let activeFileId = null;
+        let fileContentsCache = {};   // {file_id: content}
+        let contextMenuFileId = null;
+
+        function isMultiFileMode() {
+            return currentProject || currentShareLink;
+        }
+
+        function showFileTree(show) {
+            document.getElementById('liveFileTree').style.display = show ? '' : 'none';
+            document.getElementById('liveTreeDivider').style.display = show ? '' : 'none';
+        }
+
         function enterLiveMode() {
             currentProject = null;
             currentShareLink = null;
             liveEditor.readOnly = false;
-            document.getElementById('liveHeaderTitle').textContent = '✏️ LaTeX Live Mode';
+            document.getElementById('liveHeaderTitle').textContent = 'LaTeX Live Mode';
+            document.getElementById('liveHeaderTitle').classList.remove('editable');
             document.getElementById('liveSaveBtn').style.display = 'none';
+            showFileTree(false);
+            projectFiles = [];
+            activeFileId = null;
+            fileContentsCache = {};
+            document.getElementById('editorPanelLabel').textContent = 'LaTeX Source';
             if (!liveEditor.value) {
                 liveEditor.value = DEFAULT_TEX;
             }
@@ -1338,6 +1672,10 @@ The quadratic formula is:
         }
 
         function exitLiveMode() {
+            // Save current file content to cache before checking
+            if (activeFileId && isMultiFileMode()) {
+                fileContentsCache[activeFileId] = liveEditor.value;
+            }
             // Prompt save if project has unsaved changes
             if (currentProject && liveEditor.value !== lastSavedSource) {
                 if (confirm('You have unsaved changes. Save before exiting?')) {
@@ -1350,6 +1688,10 @@ The quadratic formula is:
             clearInterval(autoSaveTimer);
             currentProject = null;
             currentShareLink = null;
+            projectFiles = [];
+            activeFileId = null;
+            fileContentsCache = {};
+            showFileTree(false);
             // If on shared hash, go home
             if (window.location.hash.startsWith('#/shared/')) {
                 window.location.hash = '#/';
@@ -1385,44 +1727,98 @@ The quadratic formula is:
         }
 
         async function saveProject() {
-            const source = liveEditor.value;
-            try {
-                if (currentProject) {
-                    await authFetch(`/api/projects/${currentProject.id}`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ source }),
-                    });
-                } else if (currentShareLink && currentShareLink.access_level === 'contributor') {
-                    await fetch(`/api/shared/${currentShareLink.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ source }),
-                    });
+            if (activeFileId && isMultiFileMode()) {
+                // Save active file
+                const content = liveEditor.value;
+                fileContentsCache[activeFileId] = content;
+                try {
+                    if (currentProject) {
+                        await authFetch(`/api/projects/${currentProject.id}/files/${activeFileId}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ content }),
+                        });
+                    } else if (currentShareLink && currentShareLink.access_level === 'contributor') {
+                        await fetch(`/api/shared/${currentShareLink.id}/files/${activeFileId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content }),
+                        });
+                    }
+                    lastSavedSource = content;
+                    setLiveStatus('saved', 'Saved');
+                    setTimeout(() => {
+                        if (liveStatus.textContent === 'Saved') setLiveStatus('ready', 'Ready');
+                    }, 2000);
+                } catch (e) {
+                    setLiveStatus('error', 'Save failed');
                 }
-                lastSavedSource = source;
-                setLiveStatus('saved', 'Saved');
-                setTimeout(() => {
-                    if (liveStatus.textContent === 'Saved') setLiveStatus('ready', 'Ready');
-                }, 2000);
-            } catch (e) {
-                setLiveStatus('error', 'Save failed');
+            } else {
+                // Legacy single-file save
+                const source = liveEditor.value;
+                try {
+                    if (currentProject) {
+                        await authFetch(`/api/projects/${currentProject.id}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ source }),
+                        });
+                    } else if (currentShareLink && currentShareLink.access_level === 'contributor') {
+                        await fetch(`/api/shared/${currentShareLink.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ source }),
+                        });
+                    }
+                    lastSavedSource = source;
+                    setLiveStatus('saved', 'Saved');
+                    setTimeout(() => {
+                        if (liveStatus.textContent === 'Saved') setLiveStatus('ready', 'Ready');
+                    }, 2000);
+                } catch (e) {
+                    setLiveStatus('error', 'Save failed');
+                }
             }
         }
 
         async function liveRender() {
             if (liveRendering) return;
-            const source = liveEditor.value.trim();
-            if (!source) return;
-
             liveRendering = true;
             setLiveStatus('compiling', 'Compiling…');
 
             try {
-                const formData = new FormData();
-                formData.append('source', source);
-                formData.append('runs', '3');
-
-                const response = await fetch('/render-source', { method: 'POST', body: formData });
+                let response;
+                if (isMultiFileMode() && projectFiles.length > 0) {
+                    // Save current file first
+                    if (activeFileId) {
+                        fileContentsCache[activeFileId] = liveEditor.value;
+                        if (currentProject) {
+                            await authFetch(`/api/projects/${currentProject.id}/files/${activeFileId}`, {
+                                method: 'PUT',
+                                body: JSON.stringify({ content: liveEditor.value }),
+                            });
+                        } else if (currentShareLink && currentShareLink.access_level === 'contributor') {
+                            await fetch(`/api/shared/${currentShareLink.id}/files/${activeFileId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ content: liveEditor.value }),
+                            });
+                        }
+                        lastSavedSource = liveEditor.value;
+                    }
+                    // Render via multi-file endpoint
+                    if (currentProject) {
+                        response = await authFetch(`/api/projects/${currentProject.id}/render`, { method: 'POST' });
+                    } else if (currentShareLink) {
+                        response = await fetch(`/api/shared/${currentShareLink.id}/render`, { method: 'POST' });
+                    }
+                } else {
+                    // Single-file render
+                    const source = liveEditor.value.trim();
+                    if (!source) { liveRendering = false; return; }
+                    const formData = new FormData();
+                    formData.append('source', source);
+                    formData.append('runs', '3');
+                    response = await fetch('/render-source', { method: 'POST', body: formData });
+                }
 
                 if (response.ok && response.headers.get('content-type')?.includes('application/pdf')) {
                     const blob = await response.blob();
@@ -1468,7 +1864,365 @@ The quadratic formula is:
             liveDebounceTimer = setTimeout(liveRender, 1500);
         });
 
-        // Draggable divider
+        /* ═══════════════════════════════════════
+           File Tree
+           ═══════════════════════════════════════ */
+        async function loadFileTree(projectId) {
+            try {
+                let files;
+                if (currentProject) {
+                    const res = await authFetch(`/api/projects/${projectId}/files`);
+                    files = await res.json();
+                } else if (currentShareLink) {
+                    const res = await fetch(`/api/shared/${currentShareLink.id}`);
+                    const data = await res.json();
+                    files = data.files || [];
+                }
+                projectFiles = files || [];
+                renderFileTree();
+            } catch (e) {
+                console.error('Failed to load file tree:', e);
+            }
+        }
+
+        function renderFileTree() {
+            const list = document.getElementById('fileTreeList');
+            const mainFile = currentProject?.main_file || 'main.tex';
+
+            if (projectFiles.length === 0) {
+                list.innerHTML = '<li style="padding:12px;color:#555;font-size:0.8rem;text-align:center;">No files</li>';
+                return;
+            }
+
+            list.innerHTML = projectFiles.map(f => {
+                const isActive = f.id === activeFileId;
+                const isMain = f.filename === mainFile;
+                const ext = f.filename.split('.').pop().toLowerCase();
+                const icon = ext === 'tex' ? '&#x1F4C4;' : ext === 'bib' ? '&#x1F4DA;' : ext === 'cls' || ext === 'sty' ? '&#x2699;' : '&#x1F4C3;';
+                return `
+                    <li class="file-tree-item${isActive ? ' active' : ''}${isMain ? ' main-file' : ''}"
+                        data-file-id="${f.id}" data-filename="${escHtml(f.filename)}"
+                        onclick="openFile('${f.id}')"
+                        oncontextmenu="showFileContextMenu(event, '${f.id}')">
+                        <span class="file-tree-icon">${icon}</span>
+                        <span class="file-tree-name">${escHtml(f.filename)}</span>
+                    </li>`;
+            }).join('');
+        }
+
+        async function openFile(fileId) {
+            // Save current file to cache
+            if (activeFileId && activeFileId !== fileId) {
+                fileContentsCache[activeFileId] = liveEditor.value;
+                // Auto-save previous file
+                if (liveEditor.value !== lastSavedSource) {
+                    try {
+                        if (currentProject) {
+                            await authFetch(`/api/projects/${currentProject.id}/files/${activeFileId}`, {
+                                method: 'PUT',
+                                body: JSON.stringify({ content: liveEditor.value }),
+                            });
+                        } else if (currentShareLink && currentShareLink.access_level === 'contributor') {
+                            await fetch(`/api/shared/${currentShareLink.id}/files/${activeFileId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ content: liveEditor.value }),
+                            });
+                        }
+                    } catch(e) { /* ignore */ }
+                }
+            }
+
+            activeFileId = fileId;
+            renderFileTree();
+
+            // Get content from cache or fetch
+            if (fileContentsCache[fileId] !== undefined) {
+                liveEditor.value = fileContentsCache[fileId];
+                lastSavedSource = fileContentsCache[fileId];
+            } else {
+                try {
+                    let f;
+                    if (currentProject) {
+                        const res = await authFetch(`/api/projects/${currentProject.id}/files/${fileId}`);
+                        f = await res.json();
+                    } else if (currentShareLink) {
+                        const res = await fetch(`/api/shared/${currentShareLink.id}/files/${fileId}`);
+                        f = await res.json();
+                    }
+                    fileContentsCache[fileId] = f.content;
+                    liveEditor.value = f.content;
+                    lastSavedSource = f.content;
+                } catch (e) {
+                    liveEditor.value = '% Error loading file';
+                }
+            }
+
+            // Update label
+            const fname = projectFiles.find(f => f.id === fileId)?.filename || 'Unknown';
+            document.getElementById('editorPanelLabel').textContent = fname;
+            liveEditor.focus();
+        }
+
+        function startNewFile() {
+            const list = document.getElementById('fileTreeList');
+            // Add input at the end
+            const li = document.createElement('li');
+            li.style.padding = '4px 8px';
+            const input = document.createElement('input');
+            input.className = 'file-tree-new-input';
+            input.placeholder = 'filename.tex';
+            input.style.margin = '0';
+            li.appendChild(input);
+            list.appendChild(li);
+            input.focus();
+
+            async function create() {
+                const filename = input.value.trim();
+                li.remove();
+                if (!filename) return;
+                try {
+                    if (currentProject) {
+                        const res = await authFetch(`/api/projects/${currentProject.id}/files`, {
+                            method: 'POST',
+                            body: JSON.stringify({ filename, content: '' }),
+                        });
+                        if (res.ok) {
+                            const f = await res.json();
+                            projectFiles.push({ id: f.id, filename: f.filename, updated_at: f.updated_at });
+                            fileContentsCache[f.id] = '';
+                            renderFileTree();
+                            openFile(f.id);
+                        } else {
+                            const err = await res.json();
+                            alert(err.detail || 'Failed to create file');
+                        }
+                    }
+                } catch(e) { /* ignore */ }
+            }
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); create(); }
+                if (e.key === 'Escape') li.remove();
+            });
+            input.addEventListener('blur', create);
+        }
+
+        // Context menu
+        function showFileContextMenu(e, fileId) {
+            e.preventDefault();
+            e.stopPropagation();
+            contextMenuFileId = fileId;
+            const menu = document.getElementById('fileContextMenu');
+            menu.style.left = e.clientX + 'px';
+            menu.style.top = e.clientY + 'px';
+            menu.classList.add('active');
+        }
+
+        document.addEventListener('click', () => {
+            document.getElementById('fileContextMenu').classList.remove('active');
+        });
+
+        function contextRenameFile() {
+            if (!contextMenuFileId) return;
+            const item = document.querySelector(`.file-tree-item[data-file-id="${contextMenuFileId}"]`);
+            if (!item) return;
+            const nameEl = item.querySelector('.file-tree-name');
+            const oldName = nameEl.textContent;
+            const input = document.createElement('input');
+            input.className = 'file-tree-rename-input';
+            input.value = oldName;
+            nameEl.replaceWith(input);
+            input.focus();
+            input.select();
+
+            async function doRename() {
+                const newName = input.value.trim();
+                const span = document.createElement('span');
+                span.className = 'file-tree-name';
+                if (!newName || newName === oldName) {
+                    span.textContent = oldName;
+                    input.replaceWith(span);
+                    return;
+                }
+                try {
+                    if (currentProject) {
+                        const res = await authFetch(`/api/projects/${currentProject.id}/files/${contextMenuFileId}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ filename: newName }),
+                        });
+                        if (res.ok) {
+                            const pf = projectFiles.find(f => f.id === contextMenuFileId);
+                            if (pf) pf.filename = newName;
+                            span.textContent = newName;
+                            if (activeFileId === contextMenuFileId) {
+                                document.getElementById('editorPanelLabel').textContent = newName;
+                            }
+                        } else {
+                            const err = await res.json();
+                            alert(err.detail || 'Rename failed');
+                            span.textContent = oldName;
+                        }
+                    }
+                } catch(e) {
+                    span.textContent = oldName;
+                }
+                input.replaceWith(span);
+            }
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); doRename(); }
+                if (e.key === 'Escape') { input.value = oldName; doRename(); }
+            });
+            input.addEventListener('blur', doRename);
+        }
+
+        async function contextSetMainFile() {
+            if (!contextMenuFileId || !currentProject) return;
+            const pf = projectFiles.find(f => f.id === contextMenuFileId);
+            if (!pf) return;
+            try {
+                await authFetch(`/api/projects/${currentProject.id}/main-file`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ main_file: pf.filename }),
+                });
+                currentProject.main_file = pf.filename;
+                renderFileTree();
+                setLiveStatus('saved', `Main file: ${pf.filename}`);
+                setTimeout(() => setLiveStatus('ready', 'Ready'), 2000);
+            } catch(e) { /* ignore */ }
+        }
+
+        async function contextDeleteFile() {
+            if (!contextMenuFileId || !currentProject) return;
+            const pf = projectFiles.find(f => f.id === contextMenuFileId);
+            if (!pf) return;
+            if (!confirm(`Delete "${pf.filename}"?`)) return;
+            try {
+                const res = await authFetch(`/api/projects/${currentProject.id}/files/${contextMenuFileId}`, {
+                    method: 'DELETE',
+                });
+                if (res.ok) {
+                    projectFiles = projectFiles.filter(f => f.id !== contextMenuFileId);
+                    delete fileContentsCache[contextMenuFileId];
+                    if (activeFileId === contextMenuFileId) {
+                        activeFileId = null;
+                        if (projectFiles.length > 0) {
+                            openFile(projectFiles[0].id);
+                        } else {
+                            liveEditor.value = '';
+                            document.getElementById('editorPanelLabel').textContent = 'LaTeX Source';
+                        }
+                    }
+                    renderFileTree();
+                }
+            } catch(e) { /* ignore */ }
+        }
+
+        /* ═══════════════════════════════════════
+           ZIP Upload / Download
+           ═══════════════════════════════════════ */
+        function triggerZipUpload() {
+            document.getElementById('zipUploadInput').click();
+        }
+
+        document.getElementById('zipUploadInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || !currentProject) return;
+            e.target.value = '';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                setLiveStatus('compiling', 'Uploading ZIP...');
+                const res = await authFetch(`/api/projects/${currentProject.id}/upload-zip`, {
+                    method: 'POST',
+                    headers: {}, // Let browser set Content-Type for FormData
+                    body: formData,
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    projectFiles = data.files;
+                    fileContentsCache = {};
+                    renderFileTree();
+                    // Open main file
+                    const mainFile = currentProject.main_file || 'main.tex';
+                    const mainF = projectFiles.find(f => f.filename === mainFile || f.filename.endsWith('/main.tex'));
+                    if (mainF) {
+                        openFile(mainF.id);
+                    } else if (projectFiles.length > 0) {
+                        openFile(projectFiles[0].id);
+                    }
+                    setLiveStatus('saved', 'ZIP uploaded');
+                    setTimeout(() => setLiveStatus('ready', 'Ready'), 2000);
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Upload failed');
+                    setLiveStatus('error', 'Upload failed');
+                }
+            } catch(e) {
+                alert('Upload failed: ' + e.message);
+                setLiveStatus('error', 'Upload failed');
+            }
+        });
+
+        async function downloadProjectZip() {
+            if (!currentProject) return;
+            try {
+                const res = await authFetch(`/api/projects/${currentProject.id}/download-zip`);
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = (currentProject.title || 'project') + '.zip';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            } catch(e) { /* ignore */ }
+        }
+
+        /* ═══════════════════════════════════════
+           Editable Project Title
+           ═══════════════════════════════════════ */
+        document.getElementById('liveHeaderTitle').addEventListener('click', function() {
+            if (!currentProject) return;
+            const titleEl = this;
+            const currentTitle = currentProject.title;
+
+            const input = document.createElement('input');
+            input.className = 'live-header-title-input';
+            input.value = currentTitle;
+            titleEl.textContent = '';
+            titleEl.appendChild(input);
+            input.focus();
+            input.select();
+
+            async function finishEdit() {
+                const newTitle = input.value.trim() || currentTitle;
+                titleEl.textContent = newTitle;
+                if (newTitle !== currentTitle) {
+                    try {
+                        await authFetch(`/api/projects/${currentProject.id}/title`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ title: newTitle }),
+                        });
+                        currentProject.title = newTitle;
+                    } catch(e) {
+                        titleEl.textContent = currentTitle;
+                    }
+                }
+            }
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                if (e.key === 'Escape') { input.value = currentTitle; input.blur(); }
+            });
+            input.addEventListener('blur', finishEdit);
+        });
+
+        // Draggable divider (editor/preview)
         (() => {
             const divider = document.getElementById('liveDivider');
             const editorPanel = document.querySelector('.live-editor-panel');
@@ -1488,10 +2242,12 @@ The quadratic formula is:
             document.addEventListener('mousemove', (e) => {
                 if (!dragging) return;
                 const rect = liveBody.getBoundingClientRect();
-                const offset = e.clientX - rect.left;
-                const dividerWidth = divider.offsetWidth;
-                const availableWidth = rect.width - dividerWidth;
-                const pct = ((offset - dividerWidth / 2) / availableWidth) * 100;
+                const fileTree = document.getElementById('liveFileTree');
+                const treeDivider = document.getElementById('liveTreeDivider');
+                const treeWidth = fileTree.style.display === 'none' ? 0 : fileTree.offsetWidth + treeDivider.offsetWidth;
+                const offset = e.clientX - rect.left - treeWidth;
+                const availableWidth = rect.width - treeWidth - divider.offsetWidth;
+                const pct = (offset / availableWidth) * 100;
                 const clamped = Math.min(Math.max(pct, 10), 90);
                 editorPanel.style.flex = 'none';
                 editorPanel.style.width = clamped + '%';
@@ -1506,6 +2262,38 @@ The quadratic formula is:
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
                 pdfPanel.style.pointerEvents = '';
+            });
+        })();
+
+        // Draggable tree divider
+        (() => {
+            const treeDivider = document.getElementById('liveTreeDivider');
+            const fileTree = document.getElementById('liveFileTree');
+            let dragging = false;
+
+            treeDivider.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                dragging = true;
+                treeDivider.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!dragging) return;
+                const liveBody = document.querySelector('.live-body');
+                const rect = liveBody.getBoundingClientRect();
+                const width = e.clientX - rect.left;
+                const clamped = Math.min(Math.max(width, 140), 400);
+                fileTree.style.width = clamped + 'px';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (!dragging) return;
+                dragging = false;
+                treeDivider.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
             });
         })();
 

@@ -13,6 +13,9 @@ from database import (
     init_db, create_user, get_user_by_email, get_user_by_id,
     create_project, list_projects, get_project, update_project, delete_project,
     create_share_link, get_share_link, list_share_links, delete_share_link,
+    create_project_file, list_project_files, get_project_file,
+    get_project_file_by_name, update_project_file, delete_project_file,
+    delete_all_project_files,
 )
 from auth import hash_password, verify_password, create_token, get_current_user, require_user
 
@@ -377,6 +380,17 @@ class ShareBody(BaseModel):
 class SharedUpdateBody(BaseModel):
     source: str
 
+class FileBody(BaseModel):
+    filename: str
+    content: str | None = ""
+
+class FileUpdateBody(BaseModel):
+    filename: str | None = None
+    content: str | None = None
+
+class TitleBody(BaseModel):
+    title: str
+
 # ─── Auth endpoints ───
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -431,7 +445,8 @@ async def api_get_project(project_id: str, request: Request):
     if not project or project["user_id"] != user["id"]:
         raise HTTPException(404, "Project not found")
     links = list_share_links(project_id)
-    return {**project, "share_links": links}
+    files = list_project_files(project_id)
+    return {**project, "share_links": links, "files": files}
 
 @app.put("/api/projects/{project_id}")
 async def api_update_project(project_id: str, request: Request, body: ProjectBody):
@@ -450,6 +465,209 @@ async def api_delete_project(project_id: str, request: Request):
         raise HTTPException(404, "Project not found")
     delete_project(project_id)
     return {"ok": True}
+
+# ─── Project title endpoint ───
+
+@app.patch("/api/projects/{project_id}/title")
+async def api_update_title(project_id: str, request: Request, body: TitleBody):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    updated = update_project(project_id, title=body.title)
+    return {"ok": True, "title": updated["title"]}
+
+class MainFileBody(BaseModel):
+    main_file: str
+
+@app.patch("/api/projects/{project_id}/main-file")
+async def api_set_main_file(project_id: str, request: Request, body: MainFileBody):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    # Verify the file exists
+    f = get_project_file_by_name(project_id, body.main_file)
+    if not f:
+        raise HTTPException(404, f"File '{body.main_file}' not found in project")
+    from database import get_db
+    db = get_db()
+    db.execute("UPDATE projects SET main_file = ? WHERE id = ?", (body.main_file, project_id))
+    db.commit()
+    db.close()
+    return {"ok": True, "main_file": body.main_file}
+
+# ─── Project file endpoints ───
+
+@app.get("/api/projects/{project_id}/files")
+async def api_list_files(project_id: str, request: Request):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    return list_project_files(project_id)
+
+@app.post("/api/projects/{project_id}/files")
+async def api_create_file(project_id: str, request: Request, body: FileBody):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    existing = get_project_file_by_name(project_id, body.filename)
+    if existing:
+        raise HTTPException(409, f"File '{body.filename}' already exists")
+    f = create_project_file(project_id, body.filename, body.content or "")
+    return f
+
+@app.get("/api/projects/{project_id}/files/{file_id}")
+async def api_get_file(project_id: str, file_id: str, request: Request):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    f = get_project_file(file_id)
+    if not f or f["project_id"] != project_id:
+        raise HTTPException(404, "File not found")
+    return f
+
+@app.put("/api/projects/{project_id}/files/{file_id}")
+async def api_update_file(project_id: str, file_id: str, request: Request, body: FileUpdateBody):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    f = get_project_file(file_id)
+    if not f or f["project_id"] != project_id:
+        raise HTTPException(404, "File not found")
+    if body.filename is not None and body.filename != f["filename"]:
+        existing = get_project_file_by_name(project_id, body.filename)
+        if existing:
+            raise HTTPException(409, f"File '{body.filename}' already exists")
+    updated = update_project_file(file_id, filename=body.filename, content=body.content)
+    return updated
+
+@app.delete("/api/projects/{project_id}/files/{file_id}")
+async def api_delete_file(project_id: str, file_id: str, request: Request):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    f = get_project_file(file_id)
+    if not f or f["project_id"] != project_id:
+        raise HTTPException(404, "File not found")
+    delete_project_file(file_id)
+    return {"ok": True}
+
+# ─── Project render (multi-file) ───
+
+@app.post("/api/projects/{project_id}/render")
+@limiter.limit("10/minute")
+async def api_render_project(project_id: str, request: Request):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+    files = list_project_files(project_id)
+    if not files:
+        raise HTTPException(400, "Project has no files")
+
+    # Write all files to a temp directory
+    workdir = tempfile.mkdtemp(prefix="latexapi_project_")
+    try:
+        for fmeta in files:
+            full_file = get_project_file(fmeta["id"])
+            fpath = os.path.join(workdir, full_file["filename"])
+            # Create subdirectories if filename contains /
+            os.makedirs(os.path.dirname(fpath) or workdir, exist_ok=True)
+            # Validate path stays within workdir
+            real_path = os.path.realpath(fpath)
+            if not real_path.startswith(os.path.realpath(workdir)):
+                raise HTTPException(400, f"Invalid filename: {full_file['filename']}")
+            with open(fpath, "w", encoding="utf-8") as f:
+                f.write(full_file["content"])
+
+        main_file = project.get("main_file", "main.tex")
+        entry = _detect_entrypoint(workdir, main_file)
+        pdf_path, log = _compile_latexmk(entry, 3)
+
+        if not pathlib.Path(pdf_path).exists():
+            return JSONResponse(
+                status_code=422,
+                content={"error": "Compilation failed", "log": log[-20000:]},
+            )
+        with open(pdf_path, "rb") as f:
+            pdf_content = f.read()
+        return StreamingResponse(
+            io.BytesIO(pdf_content),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="output.pdf"'},
+        )
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+# ─── ZIP upload/download ───
+
+@app.post("/api/projects/{project_id}/upload-zip")
+async def api_upload_zip(project_id: str, request: Request, file: UploadFile = File(...)):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+
+    zip_bytes = await file.read()
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+            # Clear existing files
+            delete_all_project_files(project_id)
+            for member in z.namelist():
+                # Skip directories and hidden/system files
+                if member.endswith('/') or member.startswith('__MACOSX') or member.startswith('.'):
+                    continue
+                # Read content as text (skip binary files)
+                try:
+                    content = z.read(member).decode('utf-8')
+                except UnicodeDecodeError:
+                    continue
+                # Normalize path: strip leading directory if all files share one
+                filename = member
+                create_project_file(project_id, filename, content)
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "Invalid ZIP file")
+
+    files = list_project_files(project_id)
+    # Auto-detect and set main file
+    filenames = [f["filename"] for f in files]
+    main_candidates = [fn for fn in filenames if fn.lower().endswith("main.tex") or fn.lower() == "main.tex"]
+    if main_candidates:
+        from database import get_db
+        db = get_db()
+        db.execute("UPDATE projects SET main_file = ? WHERE id = ?", (main_candidates[0], project_id))
+        db.commit()
+        db.close()
+
+    return {"ok": True, "files": files}
+
+@app.get("/api/projects/{project_id}/download-zip")
+async def api_download_zip(project_id: str, request: Request):
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+
+    files = list_project_files(project_id)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
+        for fmeta in files:
+            full_file = get_project_file(fmeta["id"])
+            z.writestr(full_file["filename"], full_file["content"])
+    buf.seek(0)
+
+    safe_title = re.sub(r'[^\w\-. ]', '_', project["title"])
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.zip"'},
+    )
 
 # ─── Share link endpoints ───
 
@@ -478,10 +696,37 @@ async def api_get_shared(link_id: str):
     link = get_share_link(link_id)
     if not link:
         raise HTTPException(404, "Share link not found or expired")
+    files = list_project_files(link["project_id"])
+    project = get_project(link["project_id"])
+    main_file = project["main_file"] if project else "main.tex"
     return {
-        "project": {"id": link["project_id"], "title": link["title"], "source": link["source"]},
+        "project": {"id": link["project_id"], "title": link["title"], "source": link["source"], "main_file": main_file},
         "access_level": link["access_level"],
+        "files": files,
     }
+
+@app.get("/api/shared/{link_id}/files/{file_id}")
+async def api_get_shared_file(link_id: str, file_id: str):
+    link = get_share_link(link_id)
+    if not link:
+        raise HTTPException(404, "Share link not found")
+    f = get_project_file(file_id)
+    if not f or f["project_id"] != link["project_id"]:
+        raise HTTPException(404, "File not found")
+    return f
+
+@app.put("/api/shared/{link_id}/files/{file_id}")
+async def api_update_shared_file(link_id: str, file_id: str, body: FileUpdateBody):
+    link = get_share_link(link_id)
+    if not link:
+        raise HTTPException(404, "Share link not found")
+    if link["access_level"] != "contributor":
+        raise HTTPException(403, "This link is readonly")
+    f = get_project_file(file_id)
+    if not f or f["project_id"] != link["project_id"]:
+        raise HTTPException(404, "File not found")
+    updated = update_project_file(file_id, content=body.content)
+    return updated
 
 @app.put("/api/shared/{link_id}")
 async def api_update_shared(link_id: str, body: SharedUpdateBody):
@@ -492,6 +737,52 @@ async def api_update_shared(link_id: str, body: SharedUpdateBody):
         raise HTTPException(403, "This link is readonly")
     update_project(link["project_id"], source=body.source)
     return {"ok": True}
+
+# ─── Shared project render (multi-file) ───
+
+@app.post("/api/shared/{link_id}/render")
+@limiter.limit("10/minute")
+async def api_render_shared_project(link_id: str, request: Request):
+    link = get_share_link(link_id)
+    if not link:
+        raise HTTPException(404, "Share link not found")
+    project = get_project(link["project_id"])
+    if not project:
+        raise HTTPException(404, "Project not found")
+    files = list_project_files(project["id"])
+    if not files:
+        raise HTTPException(400, "Project has no files")
+
+    workdir = tempfile.mkdtemp(prefix="latexapi_shared_")
+    try:
+        for fmeta in files:
+            full_file = get_project_file(fmeta["id"])
+            fpath = os.path.join(workdir, full_file["filename"])
+            os.makedirs(os.path.dirname(fpath) or workdir, exist_ok=True)
+            real_path = os.path.realpath(fpath)
+            if not real_path.startswith(os.path.realpath(workdir)):
+                raise HTTPException(400, f"Invalid filename: {full_file['filename']}")
+            with open(fpath, "w", encoding="utf-8") as f:
+                f.write(full_file["content"])
+
+        main_file = project.get("main_file", "main.tex")
+        entry = _detect_entrypoint(workdir, main_file)
+        pdf_path, log = _compile_latexmk(entry, 3)
+
+        if not pathlib.Path(pdf_path).exists():
+            return JSONResponse(
+                status_code=422,
+                content={"error": "Compilation failed", "log": log[-20000:]},
+            )
+        with open(pdf_path, "rb") as f_pdf:
+            pdf_content = f_pdf.read()
+        return StreamingResponse(
+            io.BytesIO(pdf_content),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="output.pdf"'},
+        )
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
 
 # Files are served through the download endpoint above with unique IDs
 
