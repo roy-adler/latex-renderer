@@ -706,10 +706,33 @@
             background: #252535;
         }
 
-        #livePdfFrame {
+        #pdfViewerContainer {
             flex: 1;
-            border: none;
-            background: white;
+            overflow-y: auto;
+            background: #525659;
+            position: relative;
+        }
+
+        .pdf-page-wrapper {
+            position: relative;
+            margin: 8px auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            line-height: 0;
+        }
+
+        .pdf-page-wrapper canvas {
+            display: block;
+        }
+
+        .synctex-highlight {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: rgba(255, 230, 0, 0.35);
+            pointer-events: none;
+            transition: opacity 0.8s ease;
+            border-left: 3px solid #f5c518;
         }
 
         .live-pdf-placeholder {
@@ -1028,6 +1051,8 @@
             background: #667eea;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 </head>
 <body>
     <!-- ── Top Nav ── -->
@@ -1172,12 +1197,12 @@
             </div>
             <div class="live-divider" id="liveDivider"></div>
             <div class="live-pdf-panel" id="livePdfPanel">
-                <div class="live-panel-label">Preview</div>
+                <div class="live-panel-label">Preview <span style="font-weight:normal;color:#666;font-size:0.7rem;margin-left:8px;">Click PDF = jump to source | Ctrl+Enter = jump to PDF</span></div>
                 <div class="live-pdf-placeholder" id="livePdfPlaceholder">
                     <span>📄</span>
                     <span>Start typing to see your PDF</span>
                 </div>
-                <iframe id="livePdfFrame" style="display:none;"></iframe>
+                <div id="pdfViewerContainer" style="display:none;"></div>
                 <div class="live-error-panel" id="liveErrorPanel" style="display:none;"></div>
             </div>
         </div>
@@ -1854,13 +1879,18 @@ The quadratic formula is:
 
         const liveEditor     = document.getElementById('liveEditor');
         const liveStatus     = document.getElementById('liveStatus');
-        const livePdfFrame   = document.getElementById('livePdfFrame');
+        const pdfViewerContainer = document.getElementById('pdfViewerContainer');
         const livePdfPlaceholder = document.getElementById('livePdfPlaceholder');
         const liveErrorPanel = document.getElementById('liveErrorPanel');
 
         let liveDebounceTimer = null;
-        let currentBlobUrl    = null;
         let liveRendering     = false;
+
+        // pdf.js + SyncTeX state
+        let pdfDoc = null;
+        let synctexData = null;
+        let pdfPageCanvases = [];  // [{canvas, pageNum, viewport, wrapper}]
+        let pdfScale = 1.5;
         let currentProject    = null;    // set when editing an owned project
         let currentShareLink  = null;    // set when editing via share link
         let autoSaveTimer     = null;
@@ -1936,9 +1966,12 @@ The quadratic formula is:
 
         function resetLivePreview() {
             livePdfPlaceholder.style.display = '';
-            livePdfFrame.style.display = 'none';
+            pdfViewerContainer.style.display = 'none';
             liveErrorPanel.style.display = 'none';
-            if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+            pdfDoc = null;
+            synctexData = null;
+            pdfPageCanvases = [];
+            pdfViewerContainer.innerHTML = '';
             setLiveStatus('ready', 'Ready');
             lastSavedSource = liveEditor.value;
             startAutoSave();
@@ -2055,19 +2088,23 @@ The quadratic formula is:
                     response = await fetch('/render-source', { method: 'POST', body: formData });
                 }
 
-                if (response.ok && response.headers.get('content-type')?.includes('application/pdf')) {
-                    const blob = await response.blob();
-                    const newUrl = URL.createObjectURL(blob);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.pdf_base64) {
+                        const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
+                        synctexData = data.synctex || null;
 
-                    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
-                    currentBlobUrl = newUrl;
+                        livePdfPlaceholder.style.display = 'none';
+                        liveErrorPanel.style.display = 'none';
+                        pdfViewerContainer.style.display = 'block';
 
-                    livePdfPlaceholder.style.display = 'none';
-                    liveErrorPanel.style.display = 'none';
-                    livePdfFrame.style.display = 'block';
-                    livePdfFrame.src = newUrl;
-
-                    setLiveStatus('ready', 'Ready');
+                        await renderPdfPages(pdfBytes);
+                        setLiveStatus('ready', 'Ready');
+                    } else if (data.error) {
+                        let errText = data.error;
+                        if (data.log) errText += '\n\n' + data.log;
+                        showLiveError(errText);
+                    }
                 } else {
                     let errText = `HTTP ${response.status}`;
                     try {
@@ -2086,11 +2123,187 @@ The quadratic formula is:
 
         function showLiveError(message) {
             livePdfPlaceholder.style.display = 'none';
-            livePdfFrame.style.display = 'none';
+            pdfViewerContainer.style.display = 'none';
             liveErrorPanel.style.display = 'block';
             liveErrorPanel.textContent = message;
             setLiveStatus('error', 'Error');
         }
+
+        /* ═══════════════════════════════════════
+           pdf.js Rendering + SyncTeX
+           ═══════════════════════════════════════ */
+        async function renderPdfPages(pdfBytes) {
+            // Preserve scroll position
+            const prevScroll = pdfViewerContainer.scrollTop;
+            const hadContent = pdfPageCanvases.length > 0;
+
+            // Load PDF
+            const loadingTask = pdfjsLib.getDocument({data: pdfBytes});
+            pdfDoc = await loadingTask.promise;
+
+            // Compute scale to fit container width
+            const containerWidth = pdfViewerContainer.clientWidth - 24; // padding
+            const firstPage = await pdfDoc.getPage(1);
+            const unscaledViewport = firstPage.getViewport({scale: 1});
+            pdfScale = containerWidth / unscaledViewport.width;
+            if (pdfScale < 0.5) pdfScale = 0.5;
+            if (pdfScale > 3) pdfScale = 3;
+
+            pdfViewerContainer.innerHTML = '';
+            pdfPageCanvases = [];
+
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                const page = await pdfDoc.getPage(i);
+                const viewport = page.getViewport({scale: pdfScale});
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'pdf-page-wrapper';
+                wrapper.style.width = viewport.width + 'px';
+                wrapper.style.height = viewport.height + 'px';
+                wrapper.dataset.pageNum = i;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width * (window.devicePixelRatio || 1);
+                canvas.height = viewport.height * (window.devicePixelRatio || 1);
+                canvas.style.width = viewport.width + 'px';
+                canvas.style.height = viewport.height + 'px';
+                if (synctexData) canvas.style.cursor = 'crosshair';
+
+                const ctx = canvas.getContext('2d');
+                ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+                await page.render({canvasContext: ctx, viewport}).promise;
+
+                wrapper.appendChild(canvas);
+                pdfViewerContainer.appendChild(wrapper);
+
+                pdfPageCanvases.push({canvas, pageNum: i, viewport, wrapper});
+
+                // Inverse search: click on PDF → jump to editor
+                const pageNum = i;
+                canvas.addEventListener('click', (e) => inverseSyncTexClick(e, pageNum, viewport, wrapper));
+            }
+
+            // Restore scroll position
+            if (hadContent) {
+                pdfViewerContainer.scrollTop = prevScroll;
+            }
+        }
+
+        /* ── Inverse Search: PDF click → Editor ── */
+        function inverseSyncTexClick(e, pageNum, viewport, wrapper) {
+            if (!synctexData || !synctexData.inverse) return;
+
+            const rect = wrapper.getBoundingClientRect();
+            // Convert click Y to PDF points
+            const clickY_css = e.clientY - rect.top;
+            const y_pt = clickY_css / pdfScale;
+
+            const records = synctexData.inverse[String(pageNum)];
+            if (!records || records.length === 0) return;
+
+            // Find closest record by y position
+            let best = records[0];
+            let bestDist = Math.abs(best.y - y_pt);
+            for (const r of records) {
+                const dist = Math.abs(r.y - y_pt);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = r;
+                }
+            }
+
+            scrollEditorToLine(best.file, best.line);
+        }
+
+        async function scrollEditorToLine(filename, lineNum) {
+            // If multi-file and different file, switch to it first
+            if (isMultiFileMode() && projectFiles.length > 0) {
+                const targetFile = projectFiles.find(f => f.filename === filename);
+                if (targetFile && targetFile.id !== activeFileId) {
+                    await openFile(targetFile.id);
+                }
+            }
+
+            // Scroll textarea to line
+            const text = liveEditor.value;
+            const lines = text.split('\n');
+            const targetLine = Math.max(1, Math.min(lineNum, lines.length));
+            let charOffset = 0;
+            for (let i = 0; i < targetLine - 1; i++) {
+                charOffset += lines[i].length + 1;
+            }
+            const lineEnd = charOffset + (lines[targetLine - 1] || '').length;
+
+            liveEditor.focus();
+            liveEditor.setSelectionRange(charOffset, lineEnd);
+
+            // Scroll the textarea to make the line visible
+            const lineHeight = parseFloat(getComputedStyle(liveEditor).lineHeight) || 18;
+            const scrollTarget = (targetLine - 1) * lineHeight - liveEditor.clientHeight / 3;
+            liveEditor.scrollTop = Math.max(0, scrollTarget);
+        }
+
+        /* ── Forward Search: Editor → PDF (Ctrl+Enter) ── */
+        function forwardSearch() {
+            if (!synctexData || !synctexData.forward) return;
+
+            const cursorPos = liveEditor.selectionStart;
+            const textBefore = liveEditor.value.substring(0, cursorPos);
+            const lineNum = textBefore.split('\n').length;
+
+            let filename;
+            if (isMultiFileMode() && activeFileId) {
+                const f = projectFiles.find(f => f.id === activeFileId);
+                filename = f ? f.filename : 'main.tex';
+            } else {
+                filename = 'main.tex';
+            }
+
+            const fileForward = synctexData.forward[filename];
+            if (!fileForward) return;
+
+            // Search for exact line, then nearby lines
+            let records = fileForward[String(lineNum)];
+            if (!records) {
+                // Try nearby lines (up to 5 away)
+                for (let delta = 1; delta <= 5; delta++) {
+                    records = fileForward[String(lineNum + delta)] || fileForward[String(lineNum - delta)];
+                    if (records) break;
+                }
+            }
+            if (!records || records.length === 0) return;
+
+            const target = records[0];
+            scrollPdfToPosition(target.page, target.y);
+        }
+
+        function scrollPdfToPosition(pageNum, y_pt) {
+            const pageEntry = pdfPageCanvases.find(p => p.pageNum === pageNum);
+            if (!pageEntry) return;
+
+            const wrapper = pageEntry.wrapper;
+            const y_css = y_pt * pdfScale;
+
+            // Scroll the container so the target y is visible
+            const wrapperTop = wrapper.offsetTop;
+            const targetScroll = wrapperTop + y_css - pdfViewerContainer.clientHeight / 3;
+            pdfViewerContainer.scrollTo({top: Math.max(0, targetScroll), behavior: 'smooth'});
+
+            // Flash highlight
+            const highlight = document.createElement('div');
+            highlight.className = 'synctex-highlight';
+            highlight.style.top = y_css + 'px';
+            wrapper.appendChild(highlight);
+            setTimeout(() => { highlight.style.opacity = '0'; }, 100);
+            setTimeout(() => { highlight.remove(); }, 1200);
+        }
+
+        liveEditor.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                forwardSearch();
+            }
+        });
 
         // Debounced auto-render on input (1.5 s delay)
         liveEditor.addEventListener('input', () => {

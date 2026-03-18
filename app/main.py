@@ -84,7 +84,7 @@ def _compile_latexmk(entry: str, runs: int) -> tuple[str, str]:
     shell = "-no-shell-escape"
     cmd = ["latexmk", "-pdf", "-interaction=nonstopmode", shell, "-halt-on-error", "-file-line-error", "-silent", "-f"]
     # Force pdflatex instead of XeLaTeX/LuaLaTeX
-    cmd += ["-pdflatex=pdflatex %O %S"]
+    cmd += ["-pdflatex=pdflatex -synctex=1 %O %S"]
     # Limit passes
     os.environ["LATEXMK_MAX_REPEAT"] = str(max(1, min(10, runs)))
     
@@ -142,6 +142,166 @@ def _compile_latexmk(entry: str, runs: int) -> tuple[str, str]:
     log = (result.stdout or "") + "\n" + (result.stderr or "") + "\n\n=== LaTeX Log File ===\n" + log_content
     
     return pdf_path, log
+
+def _parse_synctex(entry: str, workdir: str) -> dict | None:
+    """Parse a .synctex.gz file into forward/inverse lookup tables."""
+    import gzip as _gzip
+
+    synctex_gz = pathlib.Path(entry).with_suffix('.synctex.gz')
+    synctex_plain = pathlib.Path(entry).with_suffix('.synctex')
+
+    if synctex_gz.exists():
+        try:
+            with _gzip.open(synctex_gz, 'rt', errors='ignore') as f:
+                content = f.read()
+        except Exception:
+            return None
+    elif synctex_plain.exists():
+        try:
+            with open(synctex_plain, 'r', errors='ignore') as f:
+                content = f.read()
+        except Exception:
+            return None
+    else:
+        return None
+
+    # Parse preamble
+    magnification = 1000
+    unit = 1  # in scaled points
+    x_offset = 0
+    y_offset = 0
+    inputs = {}  # tag -> filename
+    forward = {}  # filename -> { line -> [{page, y}] }
+    inverse = {}  # page -> [{y, h, file, line}]
+
+    workdir_real = os.path.realpath(workdir)
+    current_page = 0
+
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+
+        # Preamble values
+        if line.startswith('Magnification:'):
+            try:
+                magnification = int(line.split(':')[1])
+            except (ValueError, IndexError):
+                pass
+        elif line.startswith('Unit:'):
+            try:
+                unit = int(line.split(':')[1])
+            except (ValueError, IndexError):
+                pass
+        elif line.startswith('X Offset:'):
+            try:
+                x_offset = int(line.split(':')[1])
+            except (ValueError, IndexError):
+                pass
+        elif line.startswith('Y Offset:'):
+            try:
+                y_offset = int(line.split(':')[1])
+            except (ValueError, IndexError):
+                pass
+
+        # Input file mapping
+        elif line.startswith('Input:'):
+            parts = line.split(':', 2)
+            if len(parts) == 3:
+                tag = parts[1]
+                filepath = parts[2]
+                # Make path relative to workdir
+                real = os.path.realpath(filepath)
+                if real.startswith(workdir_real + '/'):
+                    filepath = real[len(workdir_real) + 1:]
+                elif real.startswith(workdir_real):
+                    filepath = real[len(workdir_real):]
+                inputs[tag] = filepath
+
+        # Page boundaries
+        elif line.startswith('{'):
+            try:
+                current_page = int(line[1:])
+            except ValueError:
+                pass
+
+        # hbox and vbox records: h or v followed by tag:line:col:x:y:W:H:D
+        elif line[0] in ('h', 'v', '[') and ':' in line:
+            record_type = line[0]
+            data = line[1:] if record_type in ('h', 'v') else line[1:]
+            if record_type == '[':
+                # void hbox: [tag:line:col:x:y:W:H:D
+                data = line[1:]
+            parts = data.split(':')
+            if len(parts) >= 5:
+                try:
+                    tag = parts[0]
+                    line_num = int(parts[1])
+                    # col = parts[2]
+                    x = int(parts[3])
+                    y = int(parts[4])
+                    h = int(parts[7]) if len(parts) > 7 else 0
+
+                    if tag not in inputs or line_num <= 0:
+                        continue
+
+                    filename = inputs[tag]
+
+                    # Convert from synctex units to PDF points
+                    # synctex unit: unit * magnification / (1000 * 65536) points
+                    scale = unit * magnification / (1000.0 * 65536.0)
+                    y_pt = y * scale
+                    h_pt = abs(h * scale) if h else 10  # default height
+
+                    # Forward: filename -> line -> [{page, y}]
+                    if filename not in forward:
+                        forward[filename] = {}
+                    if line_num not in forward[filename]:
+                        forward[filename][line_num] = []
+                    # Avoid duplicates for the same page+line
+                    existing = forward[filename][line_num]
+                    if not any(e['page'] == current_page and abs(e['y'] - y_pt) < 1 for e in existing):
+                        existing.append({'page': current_page, 'y': round(y_pt, 2)})
+
+                    # Inverse: page -> [{y, h, file, line}]
+                    page_key = current_page
+                    if page_key not in inverse:
+                        inverse[page_key] = []
+                    inverse[page_key].append({
+                        'y': round(y_pt, 2),
+                        'h': round(h_pt, 2),
+                        'file': filename,
+                        'line': line_num,
+                    })
+                except (ValueError, IndexError):
+                    continue
+
+    # Sort inverse records by y position and deduplicate
+    for page in inverse:
+        records = inverse[page]
+        # Deduplicate: keep one record per (file, line) range
+        seen = set()
+        deduped = []
+        for r in records:
+            key = (r['file'], r['line'])
+            if key not in seen:
+                seen.add(key)
+                deduped.append(r)
+        deduped.sort(key=lambda r: r['y'])
+        inverse[page] = deduped
+
+    # Convert forward line keys to strings for JSON
+    forward_str = {}
+    for fname, lines in forward.items():
+        forward_str[fname] = {str(k): v for k, v in lines.items()}
+
+    # Convert inverse page keys to strings for JSON
+    inverse_str = {str(k): v for k, v in inverse.items()}
+
+    if not forward_str and not inverse_str:
+        return None
+
+    return {'forward': forward_str, 'inverse': inverse_str}
 
 def _generate_unique_id() -> str:
     """Generate a unique ID for file storage"""
@@ -355,11 +515,9 @@ async def render_source(
             )
         with open(pdf_path, "rb") as f:
             pdf_content = f.read()
-        return StreamingResponse(
-            io.BytesIO(pdf_content),
-            media_type="application/pdf",
-            headers={"Content-Disposition": 'inline; filename="output.pdf"'},
-        )
+        synctex_data = _parse_synctex(entry, workdir)
+        pdf_b64 = base64.b64encode(pdf_content).decode('ascii')
+        return JSONResponse(content={"pdf_base64": pdf_b64, "synctex": synctex_data})
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
@@ -601,11 +759,9 @@ async def api_render_project(project_id: str, request: Request):
             )
         with open(pdf_path, "rb") as f:
             pdf_content = f.read()
-        return StreamingResponse(
-            io.BytesIO(pdf_content),
-            media_type="application/pdf",
-            headers={"Content-Disposition": 'inline; filename="output.pdf"'},
-        )
+        synctex_data = _parse_synctex(entry, workdir)
+        pdf_b64 = base64.b64encode(pdf_content).decode('ascii')
+        return JSONResponse(content={"pdf_base64": pdf_b64, "synctex": synctex_data})
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
@@ -790,11 +946,9 @@ async def api_render_shared_project(link_id: str, request: Request):
             )
         with open(pdf_path, "rb") as f_pdf:
             pdf_content = f_pdf.read()
-        return StreamingResponse(
-            io.BytesIO(pdf_content),
-            media_type="application/pdf",
-            headers={"Content-Disposition": 'inline; filename="output.pdf"'},
-        )
+        synctex_data = _parse_synctex(entry, workdir)
+        pdf_b64 = base64.b64encode(pdf_content).decode('ascii')
+        return JSONResponse(content={"pdf_base64": pdf_b64, "synctex": synctex_data})
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
