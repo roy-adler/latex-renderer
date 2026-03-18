@@ -30,10 +30,13 @@ RUN echo "openin_any = p" >> $(kpsewhich texmf.cnf) && \
 # Create data directory for SQLite
 RUN mkdir -p /data
 
-# Security: run as non-root
+# Security: create non-root user (entrypoint drops privileges to this user)
 RUN useradd -m runner
 RUN chown runner:runner /data
-USER runner
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/opt/venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
