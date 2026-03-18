@@ -1269,7 +1269,7 @@
             </div>
             <div class="live-divider" id="liveDivider"></div>
             <div class="live-pdf-panel" id="livePdfPanel">
-                <div class="live-panel-label">Preview <span style="font-weight:normal;color:#666;font-size:0.7rem;margin-left:8px;">Click PDF = jump to source | Ctrl+Enter = jump to PDF</span></div>
+                <div class="live-panel-label">Preview <span style="font-weight:normal;color:#666;font-size:0.7rem;margin-left:8px;">Double-click PDF = jump to source | Ctrl+Enter = jump to PDF</span></div>
                 <div class="live-pdf-placeholder" id="livePdfPlaceholder">
                     <span>📄</span>
                     <span>Start typing to see your PDF</span>
@@ -2380,7 +2380,7 @@ The quadratic formula is:
 
                 // Inverse search: click on PDF → jump to editor
                 const pageNum = i;
-                canvas.addEventListener('click', (e) => inverseSyncTexClick(e, pageNum, viewport, wrapper));
+                canvas.addEventListener('dblclick', (e) => inverseSyncTexClick(e, pageNum, viewport, wrapper));
             }
 
             // Restore scroll position
