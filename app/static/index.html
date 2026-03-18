@@ -839,6 +839,54 @@
             right: -2px;
         }
 
+        .file-tree-folder {
+            user-select: none;
+        }
+
+        .file-tree-folder-header {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            cursor: pointer;
+            color: #ccc;
+            font-size: 0.82rem;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            gap: 6px;
+            transition: background 0.1s;
+        }
+
+        .file-tree-folder-header:hover {
+            background: #1e1e35;
+        }
+
+        .file-tree-folder-arrow {
+            font-size: 0.6rem;
+            transition: transform 0.15s;
+            width: 10px;
+            text-align: center;
+            flex-shrink: 0;
+            color: #888;
+        }
+
+        .file-tree-folder.collapsed .file-tree-folder-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .file-tree-folder.collapsed .file-tree-folder-children {
+            display: none;
+        }
+
+        .file-tree-folder-name {
+            font-weight: 600;
+            color: #bbb;
+        }
+
+        .file-tree-folder-children {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
         .file-tree-icon {
             font-size: 0.9rem;
             flex-shrink: 0;
@@ -1351,6 +1399,7 @@
                 currentProject = project;
                 currentShareLink = null;
                 fileContentsCache = {};
+                collapsedFolders = new Set();
                 liveEditor.readOnly = false;
                 const titleEl = document.getElementById('liveHeaderTitle');
                 titleEl.textContent = project.title;
@@ -1484,6 +1533,7 @@
                 currentProject = null;
                 currentShareLink = { id: linkId, access_level: data.access_level, project_id: data.project.id };
                 fileContentsCache = {};
+                collapsedFolders = new Set();
                 liveEditor.readOnly = data.access_level === 'readonly';
                 const titleSuffix = data.access_level === 'readonly' ? ' (readonly)' : ' (contributor)';
                 const titleEl = document.getElementById('liveHeaderTitle');
@@ -1842,6 +1892,7 @@ The quadratic formula is:
             projectFiles = [];
             activeFileId = null;
             fileContentsCache = {};
+            collapsedFolders = new Set();
             document.getElementById('editorPanelLabel').textContent = 'LaTeX Source';
             if (!liveEditor.value) {
                 liveEditor.value = DEFAULT_TEX;
@@ -1871,6 +1922,7 @@ The quadratic formula is:
             projectFiles = [];
             activeFileId = null;
             fileContentsCache = {};
+            collapsedFolders = new Set();
             showFileTree(false);
             // If on shared hash, go home
             if (window.location.hash.startsWith('#/shared/')) {
@@ -2068,6 +2120,86 @@ The quadratic formula is:
             }
         }
 
+        // Track which folders are collapsed (persists across re-renders)
+        let collapsedFolders = new Set();
+
+        function toggleFolder(folderPath) {
+            if (collapsedFolders.has(folderPath)) {
+                collapsedFolders.delete(folderPath);
+            } else {
+                collapsedFolders.add(folderPath);
+            }
+            renderFileTree();
+        }
+
+        function buildFolderTree(files) {
+            // Build a nested structure: { __files__: [...], subfolder: { __files__: [...], ... } }
+            const root = { __files__: [] };
+            for (const f of files) {
+                const parts = f.filename.split('/');
+                if (parts.length === 1) {
+                    root.__files__.push(f);
+                } else {
+                    let node = root;
+                    for (let i = 0; i < parts.length - 1; i++) {
+                        const dir = parts[i];
+                        if (!node[dir]) node[dir] = { __files__: [] };
+                        node = node[dir];
+                    }
+                    node.__files__.push(f);
+                }
+            }
+            return root;
+        }
+
+        function renderFolderNode(node, path, depth, mainFile) {
+            let html = '';
+            // Sort: folders first (alphabetical), then files (alphabetical)
+            const folderNames = Object.keys(node).filter(k => k !== '__files__').sort();
+            const files = (node.__files__ || []).slice().sort((a, b) => {
+                const nameA = a.filename.split('/').pop();
+                const nameB = b.filename.split('/').pop();
+                return nameA.localeCompare(nameB);
+            });
+
+            // Render subfolders
+            for (const dir of folderNames) {
+                const folderPath = path ? path + '/' + dir : dir;
+                const isCollapsed = collapsedFolders.has(folderPath);
+                html += `<li class="file-tree-folder${isCollapsed ? ' collapsed' : ''}">
+                    <div class="file-tree-folder-header" style="padding-left:${12 + depth * 16}px" onclick="toggleFolder('${escHtml(folderPath)}')">
+                        <span class="file-tree-folder-arrow">&#x25BC;</span>
+                        <span class="file-tree-icon">&#x1F4C1;</span>
+                        <span class="file-tree-folder-name">${escHtml(dir)}</span>
+                    </div>
+                    <ul class="file-tree-folder-children" style="list-style:none;padding:0;margin:0;">
+                        ${renderFolderNode(node[dir], folderPath, depth + 1, mainFile)}
+                    </ul>
+                </li>`;
+            }
+
+            // Render files
+            for (const f of files) {
+                const isActive = f.id === activeFileId;
+                const isMain = f.filename === mainFile;
+                const displayName = f.filename.split('/').pop();
+                const ext = displayName.split('.').pop().toLowerCase();
+                const isBin = f.is_binary;
+                const icon = isBin ? '&#x1F5BC;' : ext === 'tex' ? '&#x1F4C4;' : ext === 'bib' ? '&#x1F4DA;' : ext === 'cls' || ext === 'sty' ? '&#x2699;' : '&#x1F4C3;';
+                const padLeft = 12 + depth * 16 + (isActive ? -2 : 0);
+                html += `<li class="file-tree-item${isActive ? ' active' : ''}${isMain ? ' main-file' : ''}"
+                    style="padding-left:${padLeft}px"
+                    data-file-id="${f.id}" data-filename="${escHtml(f.filename)}"
+                    onclick="openFile('${f.id}')"
+                    oncontextmenu="showFileContextMenu(event, '${f.id}')">
+                    <span class="file-tree-icon">${icon}</span>
+                    <span class="file-tree-name">${escHtml(displayName)}</span>
+                </li>`;
+            }
+
+            return html;
+        }
+
         function renderFileTree() {
             const list = document.getElementById('fileTreeList');
             const mainFile = currentProject?.main_file || 'main.tex';
@@ -2077,21 +2209,8 @@ The quadratic formula is:
                 return;
             }
 
-            list.innerHTML = projectFiles.map(f => {
-                const isActive = f.id === activeFileId;
-                const isMain = f.filename === mainFile;
-                const ext = f.filename.split('.').pop().toLowerCase();
-                const isBin = f.is_binary;
-                const icon = isBin ? '&#x1F5BC;' : ext === 'tex' ? '&#x1F4C4;' : ext === 'bib' ? '&#x1F4DA;' : ext === 'cls' || ext === 'sty' ? '&#x2699;' : '&#x1F4C3;';
-                return `
-                    <li class="file-tree-item${isActive ? ' active' : ''}${isMain ? ' main-file' : ''}"
-                        data-file-id="${f.id}" data-filename="${escHtml(f.filename)}"
-                        onclick="openFile('${f.id}')"
-                        oncontextmenu="showFileContextMenu(event, '${f.id}')">
-                        <span class="file-tree-icon">${icon}</span>
-                        <span class="file-tree-name">${escHtml(f.filename)}</span>
-                    </li>`;
-            }).join('');
+            const tree = buildFolderTree(projectFiles);
+            list.innerHTML = renderFolderNode(tree, '', 0, mainFile);
         }
 
         async function openFile(fileId) {
@@ -2146,9 +2265,10 @@ The quadratic formula is:
             // Update label and handle binary files
             const fmeta = projectFiles.find(f => f.id === fileId);
             const fname = fmeta?.filename || 'Unknown';
-            document.getElementById('editorPanelLabel').textContent = fname;
+            const displayName = fname.includes('/') ? fname.split('/').pop() : fname;
+            document.getElementById('editorPanelLabel').textContent = displayName;
             if (fmeta && fmeta.is_binary) {
-                liveEditor.value = `[Binary file: ${fname}]\n\nThis file cannot be edited in the text editor.`;
+                liveEditor.value = `[Binary file: ${displayName}]\n\nThis file cannot be edited in the text editor.`;
                 liveEditor.readOnly = true;
             } else {
                 if (currentProject) liveEditor.readOnly = false;
@@ -2220,44 +2340,47 @@ The quadratic formula is:
             const item = document.querySelector(`.file-tree-item[data-file-id="${contextMenuFileId}"]`);
             if (!item) return;
             const nameEl = item.querySelector('.file-tree-name');
-            const oldName = nameEl.textContent;
+            const oldDisplayName = nameEl.textContent;
+            const pf = projectFiles.find(f => f.id === contextMenuFileId);
+            const oldFullPath = pf ? pf.filename : oldDisplayName;
+            const folderPrefix = oldFullPath.includes('/') ? oldFullPath.substring(0, oldFullPath.lastIndexOf('/') + 1) : '';
             const input = document.createElement('input');
             input.className = 'file-tree-rename-input';
-            input.value = oldName;
+            input.value = oldDisplayName;
             nameEl.replaceWith(input);
             input.focus();
             input.select();
 
             async function doRename() {
-                const newName = input.value.trim();
+                const newBaseName = input.value.trim();
                 const span = document.createElement('span');
                 span.className = 'file-tree-name';
-                if (!newName || newName === oldName) {
-                    span.textContent = oldName;
+                if (!newBaseName || newBaseName === oldDisplayName) {
+                    span.textContent = oldDisplayName;
                     input.replaceWith(span);
                     return;
                 }
+                const newFullPath = folderPrefix + newBaseName;
                 try {
                     if (currentProject) {
                         const res = await authFetch(`/api/projects/${currentProject.id}/files/${contextMenuFileId}`, {
                             method: 'PUT',
-                            body: JSON.stringify({ filename: newName }),
+                            body: JSON.stringify({ filename: newFullPath }),
                         });
                         if (res.ok) {
-                            const pf = projectFiles.find(f => f.id === contextMenuFileId);
-                            if (pf) pf.filename = newName;
-                            span.textContent = newName;
+                            if (pf) pf.filename = newFullPath;
+                            span.textContent = newBaseName;
                             if (activeFileId === contextMenuFileId) {
-                                document.getElementById('editorPanelLabel').textContent = newName;
+                                document.getElementById('editorPanelLabel').textContent = newBaseName;
                             }
                         } else {
                             const err = await res.json();
                             alert(err.detail || 'Rename failed');
-                            span.textContent = oldName;
+                            span.textContent = oldDisplayName;
                         }
                     }
                 } catch(e) {
-                    span.textContent = oldName;
+                    span.textContent = oldDisplayName;
                 }
                 input.replaceWith(span);
             }
@@ -2337,6 +2460,7 @@ The quadratic formula is:
                     const data = await res.json();
                     projectFiles = data.files;
                     fileContentsCache = {};
+                collapsedFolders = new Set();
                     renderFileTree();
                     // Open main file
                     const mainFile = currentProject.main_file || 'main.tex';
