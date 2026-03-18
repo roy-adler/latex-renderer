@@ -1399,7 +1399,7 @@
                 currentProject = project;
                 currentShareLink = null;
                 fileContentsCache = {};
-                collapsedFolders = new Set();
+                expandedFolders = new Set();
                 liveEditor.readOnly = false;
                 const titleEl = document.getElementById('liveHeaderTitle');
                 titleEl.textContent = project.title;
@@ -1533,7 +1533,7 @@
                 currentProject = null;
                 currentShareLink = { id: linkId, access_level: data.access_level, project_id: data.project.id };
                 fileContentsCache = {};
-                collapsedFolders = new Set();
+                expandedFolders = new Set();
                 liveEditor.readOnly = data.access_level === 'readonly';
                 const titleSuffix = data.access_level === 'readonly' ? ' (readonly)' : ' (contributor)';
                 const titleEl = document.getElementById('liveHeaderTitle');
@@ -1892,7 +1892,7 @@ The quadratic formula is:
             projectFiles = [];
             activeFileId = null;
             fileContentsCache = {};
-            collapsedFolders = new Set();
+            expandedFolders = new Set();
             document.getElementById('editorPanelLabel').textContent = 'LaTeX Source';
             if (!liveEditor.value) {
                 liveEditor.value = DEFAULT_TEX;
@@ -1922,7 +1922,7 @@ The quadratic formula is:
             projectFiles = [];
             activeFileId = null;
             fileContentsCache = {};
-            collapsedFolders = new Set();
+            expandedFolders = new Set();
             showFileTree(false);
             // If on shared hash, go home
             if (window.location.hash.startsWith('#/shared/')) {
@@ -2120,14 +2120,14 @@ The quadratic formula is:
             }
         }
 
-        // Track which folders are collapsed (persists across re-renders)
-        let collapsedFolders = new Set();
+        // Track which folders are expanded (all start collapsed)
+        let expandedFolders = new Set();
 
         function toggleFolder(folderPath) {
-            if (collapsedFolders.has(folderPath)) {
-                collapsedFolders.delete(folderPath);
+            if (expandedFolders.has(folderPath)) {
+                expandedFolders.delete(folderPath);
             } else {
-                collapsedFolders.add(folderPath);
+                expandedFolders.add(folderPath);
             }
             renderFileTree();
         }
@@ -2165,7 +2165,7 @@ The quadratic formula is:
             // Render subfolders
             for (const dir of folderNames) {
                 const folderPath = path ? path + '/' + dir : dir;
-                const isCollapsed = collapsedFolders.has(folderPath);
+                const isCollapsed = !expandedFolders.has(folderPath);
                 html += `<li class="file-tree-folder${isCollapsed ? ' collapsed' : ''}">
                     <div class="file-tree-folder-header" style="padding-left:${12 + depth * 16}px" onclick="toggleFolder('${escHtml(folderPath)}')">
                         <span class="file-tree-folder-arrow">&#x25BC;</span>
@@ -2460,7 +2460,7 @@ The quadratic formula is:
                     const data = await res.json();
                     projectFiles = data.files;
                     fileContentsCache = {};
-                collapsedFolders = new Set();
+                expandedFolders = new Set();
                     renderFileTree();
                     // Open main file
                     const mainFile = currentProject.main_file || 'main.tex';
