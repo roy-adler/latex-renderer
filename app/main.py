@@ -145,7 +145,13 @@ def _compile_latexmk(entry: str, runs: int) -> tuple[str, str]:
     return pdf_path, log
 
 def _parse_synctex(entry: str, workdir: str) -> dict | None:
-    """Parse a .synctex.gz file into forward/inverse lookup tables."""
+    """Parse a .synctex.gz file into forward/inverse lookup tables.
+
+    SyncTeX record format (after the record-type character):
+        tag,line:x,y:W,H,D
+    where tag,line is comma-separated, x,y is comma-separated, W,H,D is comma-separated,
+    and the groups are colon-separated.
+    """
     import gzip as _gzip
 
     synctex_gz = pathlib.Path(entry).with_suffix('.synctex.gz')
@@ -166,15 +172,11 @@ def _parse_synctex(entry: str, workdir: str) -> dict | None:
     else:
         return None
 
-    # Parse preamble
     magnification = 1000
-    unit = 1  # in scaled points
-    x_offset = 0
-    y_offset = 0
-    inputs = {}  # tag -> filename
-    forward = {}  # filename -> { line -> [{page, y}] }
-    inverse = {}  # page -> [{y, h, file, line}]
-
+    unit = 1
+    inputs = {}        # tag_str -> filename
+    forward = {}       # filename -> { line_num -> [{page, y}] }
+    inverse = {}       # page_num -> [{y, h, file, line}]
     workdir_real = os.path.realpath(workdir)
     current_page = 0
 
@@ -183,107 +185,106 @@ def _parse_synctex(entry: str, workdir: str) -> dict | None:
         if not line:
             continue
 
-        # Preamble values
+        # Preamble
         if line.startswith('Magnification:'):
-            try:
-                magnification = int(line.split(':')[1])
-            except (ValueError, IndexError):
-                pass
-        elif line.startswith('Unit:'):
-            try:
-                unit = int(line.split(':')[1])
-            except (ValueError, IndexError):
-                pass
-        elif line.startswith('X Offset:'):
-            try:
-                x_offset = int(line.split(':')[1])
-            except (ValueError, IndexError):
-                pass
-        elif line.startswith('Y Offset:'):
-            try:
-                y_offset = int(line.split(':')[1])
-            except (ValueError, IndexError):
-                pass
+            try: magnification = int(line.split(':',1)[1])
+            except: pass
+            continue
+        if line.startswith('Unit:'):
+            try: unit = int(line.split(':',1)[1])
+            except: pass
+            continue
+        if line.startswith(('X Offset:', 'Y Offset:', 'Output:', 'SyncTeX', 'Content:', 'Postamble:', 'Count:', 'Post scriptum:')):
+            continue
 
-        # Input file mapping
-        elif line.startswith('Input:'):
+        # Input file mapping: "Input:tag:filepath"
+        if line.startswith('Input:'):
             parts = line.split(':', 2)
             if len(parts) == 3:
                 tag = parts[1]
                 filepath = parts[2]
-                # Make path relative to workdir
                 real = os.path.realpath(filepath)
                 if real.startswith(workdir_real + '/'):
                     filepath = real[len(workdir_real) + 1:]
                 elif real.startswith(workdir_real):
                     filepath = real[len(workdir_real):]
+                # Strip leading ./ if present
+                if filepath.startswith('./'):
+                    filepath = filepath[2:]
                 inputs[tag] = filepath
+            continue
 
-        # Page boundaries
-        elif line.startswith('{'):
+        # Page start: "{pagenum"
+        if line.startswith('{'):
+            try: current_page = int(line[1:])
+            except: pass
+            continue
+
+        # Page end, control lines
+        if line[0] in ('}', '!', ')'):
+            continue
+
+        # Records: h, v, [, (, x, k, g followed by tag,line:x,y:W,H,D
+        # We only care about h (hbox) and [ (vbox start) for mapping
+        if line[0] in ('h', '[') and ':' in line:
+            data = line[1:]
+            colon_parts = data.split(':')
+            if len(colon_parts) < 2:
+                continue
             try:
-                current_page = int(line[1:])
-            except ValueError:
-                pass
+                # First group: tag,line (possibly tag,line,column)
+                first = colon_parts[0].split(',')
+                tag = first[0]
+                line_num = int(first[1]) if len(first) > 1 else 0
 
-        # hbox and vbox records: h or v followed by tag:line:col:x:y:W:H:D
-        elif line[0] in ('h', 'v', '[') and ':' in line:
-            record_type = line[0]
-            data = line[1:] if record_type in ('h', 'v') else line[1:]
-            if record_type == '[':
-                # void hbox: [tag:line:col:x:y:W:H:D
-                data = line[1:]
-            parts = data.split(':')
-            if len(parts) >= 5:
-                try:
-                    tag = parts[0]
-                    line_num = int(parts[1])
-                    # col = parts[2]
-                    x = int(parts[3])
-                    y = int(parts[4])
-                    h = int(parts[7]) if len(parts) > 7 else 0
+                # Second group: x,v
+                second = colon_parts[1].split(',')
+                x = int(second[0]) if len(second) > 0 else 0
+                v = int(second[1]) if len(second) > 1 else 0
 
-                    if tag not in inputs or line_num <= 0:
-                        continue
+                # Third group: W,H,D
+                h_val = 0
+                if len(colon_parts) > 2:
+                    third = colon_parts[2].split(',')
+                    h_val = int(third[1]) if len(third) > 1 else 0
 
-                    filename = inputs[tag]
-
-                    # Convert from synctex units to PDF points
-                    # synctex unit: unit * magnification / (1000 * 65536) points
-                    scale = unit * magnification / (1000.0 * 65536.0)
-                    y_pt = y * scale
-                    h_pt = abs(h * scale) if h else 10  # default height
-
-                    # Forward: filename -> line -> [{page, y}]
-                    if filename not in forward:
-                        forward[filename] = {}
-                    if line_num not in forward[filename]:
-                        forward[filename][line_num] = []
-                    # Avoid duplicates for the same page+line
-                    existing = forward[filename][line_num]
-                    if not any(e['page'] == current_page and abs(e['y'] - y_pt) < 1 for e in existing):
-                        existing.append({'page': current_page, 'y': round(y_pt, 2)})
-
-                    # Inverse: page -> [{y, h, file, line}]
-                    page_key = current_page
-                    if page_key not in inverse:
-                        inverse[page_key] = []
-                    inverse[page_key].append({
-                        'y': round(y_pt, 2),
-                        'h': round(h_pt, 2),
-                        'file': filename,
-                        'line': line_num,
-                    })
-                except (ValueError, IndexError):
+                if tag not in inputs or line_num <= 0:
                     continue
 
-    # Sort inverse records by y position and deduplicate
+                filename = inputs[tag]
+
+                # Convert synctex units to PDF points
+                # With Unit:1 and Magnification:1000, scale = 1/(1000*65536) ≈ 1/65536000
+                scale = unit * magnification / (1000.0 * 65536.0)
+                y_pt = v * scale
+                h_pt = abs(h_val * scale) if h_val else 10
+
+                # Forward map
+                if filename not in forward:
+                    forward[filename] = {}
+                if line_num not in forward[filename]:
+                    forward[filename][line_num] = []
+                existing = forward[filename][line_num]
+                if not any(e['page'] == current_page and abs(e['y'] - y_pt) < 1 for e in existing):
+                    existing.append({'page': current_page, 'y': round(y_pt, 2)})
+
+                # Inverse map
+                if current_page not in inverse:
+                    inverse[current_page] = []
+                inverse[current_page].append({
+                    'y': round(y_pt, 2),
+                    'h': round(h_pt, 2),
+                    'file': filename,
+                    'line': line_num,
+                })
+            except (ValueError, IndexError):
+                continue
+
+    # Deduplicate and sort inverse records
     for page in inverse:
-        records = inverse[page]
-        # Deduplicate: keep one record per (file, line) range
         seen = set()
         deduped = []
-        for r in records:
+        for r in inverse[page]:
             key = (r['file'], r['line'])
             if key not in seen:
                 seen.add(key)
@@ -291,12 +292,8 @@ def _parse_synctex(entry: str, workdir: str) -> dict | None:
         deduped.sort(key=lambda r: r['y'])
         inverse[page] = deduped
 
-    # Convert forward line keys to strings for JSON
-    forward_str = {}
-    for fname, lines in forward.items():
-        forward_str[fname] = {str(k): v for k, v in lines.items()}
-
-    # Convert inverse page keys to strings for JSON
+    # Convert keys to strings for JSON serialization
+    forward_str = {fname: {str(k): v for k, v in lines.items()} for fname, lines in forward.items()}
     inverse_str = {str(k): v for k, v in inverse.items()}
 
     if not forward_str and not inverse_str:

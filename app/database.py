@@ -150,7 +150,7 @@ def create_project(user_id: str, title: str = "Untitled Project", source: str = 
         (file_id, project_id, source, now, now),
     )
     db.commit()
-    row = db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    row = db.execute("SELECT id, user_id, title, source, main_file, created_at, updated_at FROM projects WHERE id = ?", (project_id,)).fetchone()
     db.close()
     return dict(row)
 
@@ -204,7 +204,7 @@ def update_project(project_id: str, title: str | None = None, source: str | None
                 (file_id, project_id, main_file, source, now, now),
             )
     db.commit()
-    row = db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    row = db.execute("SELECT id, user_id, title, source, main_file, created_at, updated_at FROM projects WHERE id = ?", (project_id,)).fetchone()
     db.close()
     return dict(row)
 
