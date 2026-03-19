@@ -312,7 +312,7 @@ async function loadCachedRender(projectId) {
         const data = await res.json();
         if (data && data.pdf_base64) {
             const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
-            synctexData = data.synctex || null;
+            synctexToken = data.synctex_token || null;
             liveErrorPanel.style.display = 'none';
             pdfViewerContainer.style.display = 'block';
             await renderPdfPages(pdfBytes);
@@ -811,7 +811,7 @@ let liveRendering     = false;
 
 // pdf.js + SyncTeX state
 let pdfDoc = null;
-let synctexData = null;
+let synctexToken = null;  // token for server-side synctex lookups
 let pdfPageCanvases = [];  // [{canvas, pageNum, viewport, wrapper}]
 let pdfScale = 1.5;
 let currentProject    = null;    // set when editing an owned project
@@ -872,7 +872,7 @@ function resetLivePreview() {
     document.getElementById('pdfLoadingOverlay').style.display = 'none';
     document.getElementById('pdfRenderProgress').style.display = 'none';
     pdfDoc = null;
-    synctexData = null;
+    synctexToken = null;
     pdfPageCanvases = [];
     pdfViewerContainer.innerHTML = '';
     lastPdfBytes = null;
@@ -1098,7 +1098,7 @@ async function liveRender() {
                 if (data.timing) saveRenderTiming(data.timing);
 
                 const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
-                synctexData = data.synctex || null;
+                synctexToken = data.synctex_token || null;
 
                 livePdfPlaceholder.style.display = 'none';
                 liveErrorPanel.style.display = 'none';
@@ -1180,7 +1180,7 @@ async function renderPdfPages(pdfBytes) {
         canvas.height = viewport.height * (window.devicePixelRatio || 1);
         canvas.style.width = viewport.width + 'px';
         canvas.style.height = viewport.height + 'px';
-        if (synctexData) canvas.style.cursor = 'crosshair';
+        if (synctexToken) canvas.style.cursor = 'crosshair';
 
         const ctx = canvas.getContext('2d');
         ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
@@ -1206,30 +1206,28 @@ async function renderPdfPages(pdfBytes) {
     updatePageInfo();
 }
 
-/* ── Inverse Search: PDF click → Editor ── */
-function inverseSyncTexClick(e, pageNum, viewport, wrapper) {
-    if (!synctexData || !synctexData.inverse) return;
+/* ── Inverse Search: PDF click → Editor (server-side synctex) ── */
+async function inverseSyncTexClick(e, pageNum, _viewport, wrapper) {
+    if (!synctexToken) return;
 
     const rect = wrapper.getBoundingClientRect();
-    // Convert click Y to PDF points
+    // Convert click position to PDF points
+    const clickX_css = e.clientX - rect.left;
     const clickY_css = e.clientY - rect.top;
+    const x_pt = clickX_css / pdfScale;
     const y_pt = clickY_css / pdfScale;
 
-    const records = synctexData.inverse[String(pageNum)];
-    if (!records || records.length === 0) return;
-
-    // Find closest record by y position
-    let best = records[0];
-    let bestDist = Math.abs(best.y - y_pt);
-    for (const r of records) {
-        const dist = Math.abs(r.y - y_pt);
-        if (dist < bestDist) {
-            bestDist = dist;
-            best = r;
-        }
-    }
-
-    scrollEditorToLine(best.file, best.line);
+    try {
+        const res = await fetch('/api/synctex/inverse', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token: synctexToken, page: pageNum, x: x_pt, y: y_pt}),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.found) return;
+        scrollEditorToLine(data.file, data.line);
+    } catch (e) { /* ignore */ }
 }
 
 async function scrollEditorToLine(filename, lineNum) {
@@ -1253,13 +1251,12 @@ async function scrollEditorToLine(filename, lineNum) {
     cmEditor.scrollIntoView({line: targetLine, ch: 0}, cmEditor.getScrollInfo().clientHeight / 3);
 }
 
-/* ── Forward Search: Editor → PDF (Ctrl+Enter) ── */
-function forwardSearch() {
-    if (!synctexData || !synctexData.forward) return;
+/* ── Forward Search: Editor → PDF (Ctrl+Enter, server-side synctex) ── */
+async function forwardSearch() {
+    if (!synctexToken) return;
 
-    const cursorPos = liveEditor.selectionStart;
-    const textBefore = liveEditor.value.substring(0, cursorPos);
-    const lineNum = textBefore.split('\n').length;
+    const cursor = cmEditor.getCursor();
+    const lineNum = cursor.line + 1; // CM is 0-based, synctex is 1-based
 
     let filename;
     if (isMultiFileMode() && activeFileId) {
@@ -1269,22 +1266,17 @@ function forwardSearch() {
         filename = 'main.tex';
     }
 
-    const fileForward = synctexData.forward[filename];
-    if (!fileForward) return;
-
-    // Search for exact line, then nearby lines
-    let records = fileForward[String(lineNum)];
-    if (!records) {
-        // Try nearby lines (up to 5 away)
-        for (let delta = 1; delta <= 5; delta++) {
-            records = fileForward[String(lineNum + delta)] || fileForward[String(lineNum - delta)];
-            if (records) break;
-        }
-    }
-    if (!records || records.length === 0) return;
-
-    const target = records[0];
-    scrollPdfToPosition(target.page, target.y);
+    try {
+        const res = await fetch('/api/synctex/forward', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token: synctexToken, file: filename, line: lineNum}),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.found) return;
+        scrollPdfToPosition(data.page, data.y);
+    } catch (e) { /* ignore */ }
 }
 
 function scrollPdfToPosition(pageNum, y_pt) {

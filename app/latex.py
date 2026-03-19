@@ -1,6 +1,6 @@
 """LaTeX compilation utilities: extraction, entrypoint detection, compilation, and SyncTeX parsing."""
 
-import base64, gzip, os, pathlib, shutil, subprocess, tempfile, zipfile, io
+import base64, gzip, os, pathlib, re, shutil, subprocess, tempfile, zipfile, io
 from fastapi import HTTPException
 
 
@@ -237,3 +237,121 @@ def write_project_files_to_workdir(files_with_content: list[dict], workdir: str)
         else:
             with open(fpath, "w", encoding="utf-8") as f:
                 f.write(full_file["content"])
+
+
+def has_synctex_file(workdir: str, entry_name: str) -> bool:
+    """Check if a synctex file exists for the given entry."""
+    base = pathlib.Path(workdir) / pathlib.Path(entry_name).stem
+    return base.with_suffix('.synctex.gz').exists() or base.with_suffix('.synctex').exists()
+
+
+def synctex_forward(workdir: str, entry_name: str, filename: str, line: int) -> dict | None:
+    """Forward search: source file+line → page,x,y using the synctex CLI.
+
+    Returns {'page': int, 'x': float, 'y': float, 'h': float, 'v': float, 'W': float, 'H': float}
+    or None if lookup fails.
+    """
+    pdf_name = pathlib.Path(entry_name).with_suffix('.pdf').name
+    pdf_path = os.path.join(workdir, pdf_name)
+    if not os.path.exists(pdf_path):
+        return None
+
+    try:
+        result = subprocess.run(
+            ['synctex', 'view', '-i', f'{line}:0:{filename}', '-o', pdf_path],
+            capture_output=True, text=True, timeout=5, cwd=workdir,
+        )
+        if result.returncode != 0:
+            return None
+
+        output = result.stdout
+        # Parse output: lines like "Page:1\nBefore:\n...x:100.5\ny:200.3\n..."
+        records = []
+        current = {}
+        for raw_line in output.split('\n'):
+            raw_line = raw_line.strip()
+            if raw_line.startswith('Page:'):
+                if current.get('page'):
+                    records.append(current)
+                current = {'page': int(raw_line.split(':', 1)[1])}
+            elif ':' in raw_line and not raw_line.startswith(('This', 'SyncTeX', 'Output', 'Before', 'After', 'Offset')):
+                key, _, val = raw_line.partition(':')
+                key = key.strip().lower()
+                try:
+                    current[key] = float(val.strip())
+                except ValueError:
+                    pass
+        if current.get('page'):
+            records.append(current)
+
+        if not records:
+            return None
+
+        # Return first record (best match)
+        r = records[0]
+        return {
+            'page': r.get('page', 1),
+            'x': round(r.get('x', 0), 2),
+            'y': round(r.get('y', 0), 2),
+            'h': round(r.get('h', 0), 2),
+            'v': round(r.get('v', 0), 2),
+            'W': round(r.get('w', 0), 2),
+            'H': round(r.get('h', 0), 2),
+        }
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        return None
+
+
+def synctex_inverse(workdir: str, entry_name: str, page: int, x: float, y: float) -> dict | None:
+    """Inverse search: page,x,y → source file+line using the synctex CLI.
+
+    Returns {'file': str, 'line': int, 'column': int} or None if lookup fails.
+    """
+    pdf_name = pathlib.Path(entry_name).with_suffix('.pdf').name
+    pdf_path = os.path.join(workdir, pdf_name)
+    if not os.path.exists(pdf_path):
+        return None
+
+    try:
+        result = subprocess.run(
+            ['synctex', 'edit', '-o', f'{page}:{x}:{y}:{pdf_path}'],
+            capture_output=True, text=True, timeout=5, cwd=workdir,
+        )
+        if result.returncode != 0:
+            return None
+
+        output = result.stdout
+        workdir_real = os.path.realpath(workdir)
+
+        # Parse output: "Input:filename\nLine:42\nColumn:0\n..."
+        filename = None
+        line_num = None
+        column = 0
+        for raw_line in output.split('\n'):
+            raw_line = raw_line.strip()
+            if raw_line.startswith('Input:'):
+                filepath = raw_line.split(':', 1)[1]
+                real = os.path.realpath(os.path.join(workdir, filepath))
+                if real.startswith(workdir_real + '/'):
+                    filepath = real[len(workdir_real) + 1:]
+                elif real.startswith(workdir_real):
+                    filepath = real[len(workdir_real):]
+                if filepath.startswith('./'):
+                    filepath = filepath[2:]
+                filename = filepath
+            elif raw_line.startswith('Line:'):
+                try:
+                    line_num = int(raw_line.split(':', 1)[1])
+                except ValueError:
+                    pass
+            elif raw_line.startswith('Column:'):
+                try:
+                    column = int(raw_line.split(':', 1)[1])
+                except ValueError:
+                    pass
+
+        if filename and line_num:
+            return {'file': filename, 'line': line_num, 'column': column}
+        return None
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        return None
