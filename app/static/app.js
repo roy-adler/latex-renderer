@@ -1942,21 +1942,24 @@ async function contextDeleteFile() {
 /* ═══════════════════════════════════════
    ZIP Upload / Download
    ═══════════════════════════════════════ */
-function triggerZipUpload() {
-    document.getElementById('zipUploadInput').click();
+function triggerFileUpload() {
+    document.getElementById('fileUploadInput').click();
 }
 
-document.getElementById('zipUploadInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file || !currentProject) return;
+document.getElementById('fileUploadInput').addEventListener('change', async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !currentProject) return;
     e.target.value = '';
 
     const formData = new FormData();
-    formData.append('file', file);
+    for (const f of files) {
+        formData.append('files', f);
+    }
 
     try {
-        setLiveStatus('compiling', 'Uploading ZIP...');
-        const res = await authFetch(`/api/projects/${currentProject.id}/upload-zip`, {
+        const count = files.length;
+        setLiveStatus('compiling', `Uploading ${count} file${count > 1 ? 's' : ''}...`);
+        const res = await authFetch(`/api/projects/${currentProject.id}/upload-files`, {
             method: 'POST',
             headers: {}, // Let browser set Content-Type for FormData
             body: formData,
@@ -1964,18 +1967,16 @@ document.getElementById('zipUploadInput').addEventListener('change', async (e) =
         if (res.ok) {
             const data = await res.json();
             projectFiles = data.files;
-            fileContentsCache = {};
-        expandedFolders = new Set();
-            renderFileTree();
-            // Open main file
-            const mainFile = currentProject.main_file || 'main.tex';
-            const mainF = projectFiles.find(f => f.filename === mainFile || f.filename.endsWith('/main.tex'));
-            if (mainF) {
-                openFile(mainF.id);
-            } else if (projectFiles.length > 0) {
-                openFile(projectFiles[0].id);
+            // Clear cache for uploaded files so they get re-fetched
+            for (const id of (data.created_ids || [])) {
+                delete fileContentsCache[id];
             }
-            setLiveStatus('saved', 'ZIP uploaded');
+            renderFileTree();
+            // Open the first uploaded file if only one
+            if (data.created_ids && data.created_ids.length === 1) {
+                openFile(data.created_ids[0]);
+            }
+            setLiveStatus('saved', `${count} file${count > 1 ? 's' : ''} uploaded`);
             setTimeout(() => setLiveStatus('ready', 'Ready'), 2000);
         } else {
             const err = await res.json();

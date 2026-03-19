@@ -87,6 +87,40 @@ async def delete_file(project_id: str, file_id: str, request: Request):
     return {"ok": True}
 
 
+@router.post("/{project_id}/upload-files")
+async def upload_files(project_id: str, request: Request, files: list[UploadFile] = File(...)):
+    """Upload one or more individual files (tex, images, etc.) into a project."""
+    user = require_user(request)
+    project = get_project(project_id)
+    if not project or project["user_id"] != user["id"]:
+        raise HTTPException(404, "Project not found")
+
+    created = []
+    for f in files:
+        raw = await f.read()
+        filename = f.filename or "untitled"
+        # Sanitize: strip leading slashes/dots
+        filename = re.sub(r'^[/\\. ]+', '', filename)
+        if not filename:
+            continue
+        try:
+            content = raw.decode('utf-8')
+            is_binary = False
+        except UnicodeDecodeError:
+            content = base64.b64encode(raw).decode('ascii')
+            is_binary = True
+        # If file already exists, update it; otherwise create
+        existing = get_project_file_by_name(project_id, filename)
+        if existing:
+            update_project_file(existing["id"], content=content)
+            created.append(existing["id"])
+        else:
+            new_file = create_project_file(project_id, filename, content, is_binary=is_binary)
+            created.append(new_file["id"])
+
+    return {"ok": True, "files": list_project_files(project_id), "created_ids": created}
+
+
 @router.post("/{project_id}/upload-zip")
 async def upload_zip(project_id: str, request: Request, file: UploadFile = File(...)):
     user = require_user(request)

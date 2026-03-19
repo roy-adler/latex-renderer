@@ -141,12 +141,12 @@
                     <span class="file-tree-title">Files</span>
                     <div class="file-tree-actions">
                         <button class="file-tree-action" onclick="startNewFile()" title="New File">+</button>
-                        <button class="file-tree-action" onclick="triggerZipUpload()" title="Upload ZIP">&#8593;</button>
+                        <button class="file-tree-action" onclick="triggerFileUpload()" title="Upload Files">&#8593;</button>
                         <button class="file-tree-action" onclick="downloadProjectZip()" title="Download ZIP">&#8595;</button>
                     </div>
                 </div>
                 <ul class="file-tree-list" id="fileTreeList"></ul>
-                <input type="file" id="zipUploadInput" accept=".zip" style="display:none" />
+                <input type="file" id="fileUploadInput" multiple style="display:none" />
             </div>
             <div class="live-tree-divider" id="liveTreeDivider" style="display:none;"></div>
             <div class="live-editor-panel">
