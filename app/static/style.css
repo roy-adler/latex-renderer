@@ -768,19 +768,70 @@ body {
 }
 
 #liveEditor {
+    display: none; /* hidden; CodeMirror takes over */
+}
+
+/* ── CodeMirror dark theme (Catppuccin-inspired) ── */
+.cm-editor-wrap {
     flex: 1;
-    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.cm-editor-wrap .CodeMirror {
+    height: 100%;
     background: #1e1e2e;
     color: #cdd6f4;
     font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
     font-size: 14px;
     line-height: 1.6;
-    padding: 16px;
-    border: none;
+}
+
+.cm-editor-wrap .CodeMirror-gutters {
+    background: #181828;
+    border-right: 1px solid #2a2a3a;
+}
+
+.cm-editor-wrap .CodeMirror-linenumber {
+    color: #555;
+}
+
+.cm-editor-wrap .CodeMirror-cursor {
+    border-left-color: #cdd6f4;
+}
+
+.cm-editor-wrap .CodeMirror-selected,
+.cm-editor-wrap .CodeMirror-focused .CodeMirror-selected {
+    background: #334;
+}
+
+.cm-editor-wrap .CodeMirror-activeline-background {
+    background: #232336;
+}
+
+.cm-editor-wrap .CodeMirror-matchingbracket {
+    color: #f5c518 !important;
+    text-decoration: underline;
+}
+
+/* LaTeX syntax highlighting */
+.cm-editor-wrap .cm-keyword   { color: #cba6f7; }
+.cm-editor-wrap .cm-tag        { color: #cba6f7; }
+.cm-editor-wrap .cm-bracket    { color: #f9e2af; }
+.cm-editor-wrap .cm-atom       { color: #fab387; }
+.cm-editor-wrap .cm-number     { color: #fab387; }
+.cm-editor-wrap .cm-builtin    { color: #89b4fa; }
+.cm-editor-wrap .cm-string     { color: #a6e3a1; }
+.cm-editor-wrap .cm-comment    { color: #6c7086; font-style: italic; }
+.cm-editor-wrap .cm-variable   { color: #cdd6f4; }
+.cm-editor-wrap .cm-variable-2 { color: #89dceb; }
+.cm-editor-wrap .cm-def        { color: #f38ba8; }
+.cm-editor-wrap .cm-error      { color: #f38ba8; }
+
+/* ScrollBar styling inside CodeMirror */
+.cm-editor-wrap .CodeMirror-vscrollbar,
+.cm-editor-wrap .CodeMirror-hscrollbar {
     outline: none;
-    resize: none;
-    tab-size: 4;
-    overflow: auto;
 }
 
 .live-pdf-panel {

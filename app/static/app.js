@@ -266,6 +266,7 @@ async function openProject(projectId) {
         document.getElementById('liveSaveBtn').style.display = '';
         document.getElementById('liveModeContainer').classList.add('active');
         document.body.style.overflow = 'hidden';
+        setTimeout(() => cmEditor.refresh(), 0);
 
         // Load file tree
         projectFiles = project.files || [];
@@ -436,6 +437,7 @@ async function openSharedProject(linkId) {
         document.getElementById('liveSaveBtn').style.display = data.access_level === 'contributor' ? '' : 'none';
         document.getElementById('liveModeContainer').classList.add('active');
         document.body.style.overflow = 'hidden';
+        setTimeout(() => cmEditor.refresh(), 0);
 
         // Load file tree for shared projects
         projectFiles = data.files || [];
@@ -746,7 +748,59 @@ The quadratic formula is:
 
 \\end{document}`;
 
-const liveEditor     = document.getElementById('liveEditor');
+// Initialize CodeMirror on the textarea
+const _liveTextarea = document.getElementById('liveEditor');
+const cmEditor = CodeMirror.fromTextArea(_liveTextarea, {
+    mode: 'stex',
+    lineNumbers: true,
+    lineWrapping: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    matchBrackets: true,
+    styleActiveLine: true,
+    extraKeys: {
+        'Tab': (cm) => cm.replaceSelection('    '),
+    },
+});
+
+let _cmSilent = false; // suppress change events during programmatic setValue
+
+// Compatibility wrapper so existing code works unchanged via liveEditor.value, .focus(), etc.
+const liveEditor = {
+    _cm: cmEditor,
+    get value() { return cmEditor.getValue(); },
+    set value(v) { _cmSilent = true; cmEditor.setValue(v); _cmSilent = false; },
+    get readOnly() { return cmEditor.getOption('readOnly'); },
+    set readOnly(v) { cmEditor.setOption('readOnly', v); },
+    get selectionStart() {
+        const pos = cmEditor.getCursor('from');
+        return cmEditor.getDoc().indexFromPos(pos);
+    },
+    get selectionEnd() {
+        const pos = cmEditor.getCursor('to');
+        return cmEditor.getDoc().indexFromPos(pos);
+    },
+    get clientHeight() {
+        return cmEditor.getScrollInfo().clientHeight;
+    },
+    get scrollTop() { return cmEditor.getScrollInfo().top; },
+    set scrollTop(v) { cmEditor.scrollTo(null, v); },
+    get style() { return document.getElementById('cmEditorWrap').style; },
+    focus() { cmEditor.focus(); },
+    setSelectionRange(start, end) {
+        const doc = cmEditor.getDoc();
+        cmEditor.setSelection(doc.posFromIndex(start), doc.posFromIndex(end));
+    },
+    addEventListener(type, handler) {
+        if (type === 'input') {
+            cmEditor.on('change', handler);
+        } else if (type === 'keydown') {
+            cmEditor.on('keydown', (cm, e) => handler(e));
+        }
+    },
+};
+
 const liveStatus     = document.getElementById('liveStatus');
 const pdfViewerContainer = document.getElementById('pdfViewerContainer');
 const livePdfPlaceholder = document.getElementById('livePdfPlaceholder');
@@ -798,6 +852,7 @@ function enterLiveMode() {
     }
     document.getElementById('liveModeContainer').classList.add('active');
     document.body.style.overflow = 'hidden';
+    setTimeout(() => cmEditor.refresh(), 0);
     liveEditor.focus();
 }
 
@@ -1186,23 +1241,16 @@ async function scrollEditorToLine(filename, lineNum) {
         }
     }
 
-    // Scroll textarea to line
-    const text = liveEditor.value;
-    const lines = text.split('\n');
-    const targetLine = Math.max(1, Math.min(lineNum, lines.length));
-    let charOffset = 0;
-    for (let i = 0; i < targetLine - 1; i++) {
-        charOffset += lines[i].length + 1;
-    }
-    const lineEnd = charOffset + (lines[targetLine - 1] || '').length;
-
-    liveEditor.focus();
-    liveEditor.setSelectionRange(charOffset, lineEnd);
-
-    // Scroll the textarea to make the line visible
-    const lineHeight = parseFloat(getComputedStyle(liveEditor).lineHeight) || 18;
-    const scrollTarget = (targetLine - 1) * lineHeight - liveEditor.clientHeight / 3;
-    liveEditor.scrollTop = Math.max(0, scrollTarget);
+    // Scroll editor to line using CodeMirror API
+    const lineCount = cmEditor.lineCount();
+    const targetLine = Math.max(0, Math.min(lineNum - 1, lineCount - 1)); // CM is 0-based
+    cmEditor.focus();
+    cmEditor.setCursor({line: targetLine, ch: 0});
+    cmEditor.setSelection(
+        {line: targetLine, ch: 0},
+        {line: targetLine, ch: cmEditor.getLine(targetLine).length}
+    );
+    cmEditor.scrollIntoView({line: targetLine, ch: 0}, cmEditor.getScrollInfo().clientHeight / 3);
 }
 
 /* ── Forward Search: Editor → PDF (Ctrl+Enter) ── */
@@ -1507,15 +1555,15 @@ function downloadCurrentPdf() {
     URL.revokeObjectURL(url);
 }
 
-liveEditor.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        forwardSearch();
-    }
+// Ctrl+Enter for forward search, debounced auto-render on change
+cmEditor.setOption('extraKeys', {
+    ...cmEditor.getOption('extraKeys'),
+    'Ctrl-Enter': () => forwardSearch(),
+    'Cmd-Enter': () => forwardSearch(),
 });
 
-// Debounced auto-render on input (1.5 s delay)
-liveEditor.addEventListener('input', () => {
+cmEditor.on('change', () => {
+    if (_cmSilent) return; // ignore programmatic setValue
     clearTimeout(liveDebounceTimer);
     setLiveStatus('compiling', 'Waiting\u2026');
     liveDebounceTimer = setTimeout(liveRender, 1500);
@@ -1737,6 +1785,7 @@ async function openFile(fileId) {
         liveEditor.style.display = '';
         if (currentProject) liveEditor.readOnly = false;
         liveEditor.focus();
+        cmEditor.refresh();
     }
 }
 
@@ -2136,22 +2185,15 @@ document.getElementById('liveHeaderTitle').addEventListener('click', function() 
     });
 })();
 
-// Handle Tab key in editor
-liveEditor.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = liveEditor.selectionStart;
-        const end   = liveEditor.selectionEnd;
-        liveEditor.value = liveEditor.value.substring(0, start) + '    ' + liveEditor.value.substring(end);
-        liveEditor.selectionStart = liveEditor.selectionEnd = start + 4;
-    }
-    // Ctrl/Cmd+S to save
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (currentProject || (currentShareLink && currentShareLink.access_level === 'contributor')) {
-            saveProject();
-        }
-    }
+// Ctrl/Cmd+S to save (via CodeMirror)
+cmEditor.setOption('extraKeys', {
+    ...cmEditor.getOption('extraKeys'),
+    'Ctrl-S': () => {
+        if (currentProject || (currentShareLink && currentShareLink.access_level === 'contributor')) saveProject();
+    },
+    'Cmd-S': () => {
+        if (currentProject || (currentShareLink && currentShareLink.access_level === 'contributor')) saveProject();
+    },
 });
 
 /* ═══════════════════════════════════════
