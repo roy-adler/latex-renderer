@@ -800,6 +800,11 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    cursor: grab;
+}
+
+#pdfViewerContainer:active {
+    cursor: grabbing;
 }
 
 .pdf-page-wrapper {

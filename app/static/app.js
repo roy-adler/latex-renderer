@@ -1410,6 +1410,36 @@ pdfViewerContainer.addEventListener('wheel', (e) => {
     }
 }, {passive: false});
 
+// Click-and-drag panning
+(() => {
+    let panning = false;
+    let panStartX, panStartY, scrollStartX, scrollStartY;
+
+    pdfViewerContainer.addEventListener('mousedown', (e) => {
+        // Only left button, and not on interactive elements
+        if (e.button !== 0) return;
+        panning = true;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        scrollStartX = pdfViewerContainer.scrollLeft;
+        scrollStartY = pdfViewerContainer.scrollTop;
+        pdfViewerContainer.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!panning) return;
+        pdfViewerContainer.scrollLeft = scrollStartX - (e.clientX - panStartX);
+        pdfViewerContainer.scrollTop = scrollStartY - (e.clientY - panStartY);
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!panning) return;
+        panning = false;
+        pdfViewerContainer.style.cursor = '';
+    });
+})();
+
 function togglePdfDarkMode() {
     pdfDarkMode = !pdfDarkMode;
     const panel = document.getElementById('livePdfPanel');
