@@ -684,6 +684,97 @@
             flex-shrink: 0;
         }
 
+        /* ── PDF Toolbar (Overleaf-style) ── */
+        .pdf-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 8px;
+            background: #16162a;
+            border-bottom: 1px solid #2a2a3a;
+            flex-shrink: 0;
+            gap: 8px;
+            min-height: 34px;
+        }
+
+        .pdf-toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .pdf-toolbar-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: #aab;
+            border: none;
+            padding: 5px 7px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 500;
+            transition: background 0.15s, color 0.15s;
+            line-height: 1;
+        }
+
+        .pdf-toolbar-btn:hover {
+            background: #2a2a4a;
+            color: #dde;
+        }
+
+        .pdf-toolbar-btn:active {
+            background: #3a3a5a;
+        }
+
+        .pdf-toolbar-btn-recompile {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 5px 14px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.78rem;
+        }
+
+        .pdf-toolbar-btn-recompile:hover {
+            opacity: 0.85;
+            color: #fff;
+        }
+
+        .pdf-toolbar-separator {
+            width: 1px;
+            height: 18px;
+            background: #333;
+            margin: 0 4px;
+        }
+
+        .pdf-toolbar-page-info,
+        .pdf-toolbar-zoom-info {
+            color: #888;
+            font-size: 0.72rem;
+            font-variant-numeric: tabular-nums;
+            min-width: 42px;
+            text-align: center;
+            user-select: none;
+        }
+
+        .pdf-toolbar-zoom-info {
+            min-width: 38px;
+        }
+
+        .pdf-dark-mode #pdfViewerContainer canvas {
+            filter: invert(1) hue-rotate(180deg);
+        }
+
+        .pdf-dark-mode #pdfViewerContainer {
+            background: #333;
+        }
+
+        .pdf-dark-mode .pdf-toolbar-btn#pdfDarkModeBtn {
+            color: #facc15;
+        }
+
         #liveEditor {
             flex: 1;
             width: 100%;
@@ -1269,7 +1360,36 @@
             </div>
             <div class="live-divider" id="liveDivider"></div>
             <div class="live-pdf-panel" id="livePdfPanel">
-                <div class="live-panel-label">Preview <span style="font-weight:normal;color:#666;font-size:0.7rem;margin-left:8px;">Double-click PDF = jump to source | Ctrl+Enter = jump to PDF</span></div>
+                <div class="pdf-toolbar" id="pdfToolbar">
+                    <div class="pdf-toolbar-group">
+                        <button class="pdf-toolbar-btn pdf-toolbar-btn-recompile" id="pdfRecompileBtn" onclick="liveRender()" title="Recompile (or just type in the editor)">
+                            Recompile
+                        </button>
+                        <button class="pdf-toolbar-btn" id="pdfDownloadBtn" onclick="downloadCurrentPdf()" title="Download PDF">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </button>
+                        <button class="pdf-toolbar-btn" id="pdfDarkModeBtn" onclick="togglePdfDarkMode()" title="Toggle dark mode (invert PDF colors)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 7 4 10.5 4 14a8 8 0 0 0 16 0c0-3.5-2.5-7-8-12z"/></svg>
+                        </button>
+                    </div>
+                    <div class="pdf-toolbar-group">
+                        <button class="pdf-toolbar-btn" onclick="pdfPageNav(-1)" title="Previous page">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                        </button>
+                        <button class="pdf-toolbar-btn" onclick="pdfPageNav(1)" title="Next page">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <span class="pdf-toolbar-page-info" id="pdfPageInfo">0 / 0</span>
+                        <span class="pdf-toolbar-separator"></span>
+                        <button class="pdf-toolbar-btn" onclick="pdfZoom(-1)" title="Zoom out">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                        <button class="pdf-toolbar-btn" onclick="pdfZoom(1)" title="Zoom in">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                        <span class="pdf-toolbar-zoom-info" id="pdfZoomInfo">100%</span>
+                    </div>
+                </div>
                 <div class="live-pdf-placeholder" id="livePdfPlaceholder">
                     <span>📄</span>
                     <span>Start typing to see your PDF</span>
@@ -2125,9 +2245,14 @@ The quadratic formula is:
             synctexData = null;
             pdfPageCanvases = [];
             pdfViewerContainer.innerHTML = '';
+            lastPdfBytes = null;
+            pdfUserZoom = 1.0;
+            pdfBaseScale = null;
             setLiveStatus('ready', 'Ready');
             lastSavedSource = liveEditor.value;
             startAutoSave();
+            document.getElementById('pdfPageInfo').textContent = '0 / 0';
+            document.getElementById('pdfZoomInfo').textContent = '100%';
         }
 
         function startAutoSave() {
@@ -2337,6 +2462,9 @@ The quadratic formula is:
            pdf.js Rendering + SyncTeX
            ═══════════════════════════════════════ */
         async function renderPdfPages(pdfBytes) {
+            // Store for download
+            lastPdfBytes = pdfBytes;
+
             // Preserve scroll position
             const prevScroll = pdfViewerContainer.scrollTop;
             const hadContent = pdfPageCanvases.length > 0;
@@ -2345,13 +2473,16 @@ The quadratic formula is:
             const loadingTask = pdfjsLib.getDocument({data: pdfBytes});
             pdfDoc = await loadingTask.promise;
 
-            // Compute scale to fit container width
+            // Compute base scale to fit container width (= 100% zoom)
             const containerWidth = pdfViewerContainer.clientWidth - 24; // padding
             const firstPage = await pdfDoc.getPage(1);
             const unscaledViewport = firstPage.getViewport({scale: 1});
-            pdfScale = containerWidth / unscaledViewport.width;
-            if (pdfScale < 0.5) pdfScale = 0.5;
-            if (pdfScale > 3) pdfScale = 3;
+            pdfBaseScale = containerWidth / unscaledViewport.width;
+            if (pdfBaseScale < 0.3) pdfBaseScale = 0.3;
+            if (pdfBaseScale > 5) pdfBaseScale = 5;
+
+            // Apply user zoom on top of base scale
+            pdfScale = pdfBaseScale * pdfUserZoom;
 
             pdfViewerContainer.innerHTML = '';
             pdfPageCanvases = [];
@@ -2391,6 +2522,10 @@ The quadratic formula is:
             if (hadContent) {
                 pdfViewerContainer.scrollTop = prevScroll;
             }
+
+            // Update toolbar info
+            updateZoomInfo();
+            updatePageInfo();
         }
 
         /* ── Inverse Search: PDF click → Editor ── */
@@ -2500,6 +2635,138 @@ The quadratic formula is:
             wrapper.appendChild(highlight);
             setTimeout(() => { highlight.style.opacity = '0'; }, 100);
             setTimeout(() => { highlight.remove(); }, 1200);
+        }
+
+        /* ═══════════════════════════════════════
+           PDF Toolbar: Zoom, Dark Mode, Page Nav, Download
+           ═══════════════════════════════════════ */
+        let pdfDarkMode = false;
+        let pdfBaseScale = null;   // the "fit-to-width" scale, computed on render
+        let pdfUserZoom = 1.0;     // user zoom multiplier (1.0 = 100% = fit-to-width)
+        let lastPdfBytes = null;   // store last rendered PDF bytes for download
+
+        function updateZoomInfo() {
+            const pct = Math.round(pdfUserZoom * 100);
+            document.getElementById('pdfZoomInfo').textContent = pct + '%';
+        }
+
+        function updatePageInfo() {
+            if (!pdfDoc) {
+                document.getElementById('pdfPageInfo').textContent = '0 / 0';
+                return;
+            }
+            const currentPage = getCurrentVisiblePage();
+            document.getElementById('pdfPageInfo').textContent = currentPage + ' / ' + pdfDoc.numPages;
+        }
+
+        function getCurrentVisiblePage() {
+            if (!pdfPageCanvases.length) return 0;
+            const scrollTop = pdfViewerContainer.scrollTop;
+            const containerMid = scrollTop + pdfViewerContainer.clientHeight / 3;
+            let best = 1;
+            for (const entry of pdfPageCanvases) {
+                if (entry.wrapper.offsetTop <= containerMid) {
+                    best = entry.pageNum;
+                }
+            }
+            return best;
+        }
+
+        // Update page info on scroll
+        pdfViewerContainer.addEventListener('scroll', updatePageInfo);
+
+        function pdfPageNav(direction) {
+            if (!pdfDoc || !pdfPageCanvases.length) return;
+            const current = getCurrentVisiblePage();
+            const target = Math.max(1, Math.min(pdfDoc.numPages, current + direction));
+            const entry = pdfPageCanvases.find(p => p.pageNum === target);
+            if (entry) {
+                pdfViewerContainer.scrollTo({top: entry.wrapper.offsetTop - 4, behavior: 'smooth'});
+            }
+        }
+
+        async function pdfZoom(direction) {
+            if (!pdfDoc) return;
+            const step = 0.1;
+            const oldZoom = pdfUserZoom;
+            pdfUserZoom = Math.max(0.25, Math.min(5.0, pdfUserZoom + direction * step));
+            if (oldZoom === pdfUserZoom) return;
+
+            // Preserve scroll ratio
+            const scrollRatio = pdfViewerContainer.scrollTop / (pdfViewerContainer.scrollHeight - pdfViewerContainer.clientHeight || 1);
+
+            pdfScale = pdfBaseScale * pdfUserZoom;
+            await reRenderPdfAtScale();
+
+            // Restore scroll
+            const newMax = pdfViewerContainer.scrollHeight - pdfViewerContainer.clientHeight;
+            pdfViewerContainer.scrollTop = scrollRatio * newMax;
+
+            updateZoomInfo();
+            updatePageInfo();
+        }
+
+        async function reRenderPdfAtScale() {
+            if (!pdfDoc) return;
+            pdfViewerContainer.innerHTML = '';
+            pdfPageCanvases = [];
+
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                const page = await pdfDoc.getPage(i);
+                const viewport = page.getViewport({scale: pdfScale});
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'pdf-page-wrapper';
+                wrapper.style.width = viewport.width + 'px';
+                wrapper.style.height = viewport.height + 'px';
+                wrapper.dataset.pageNum = i;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width * (window.devicePixelRatio || 1);
+                canvas.height = viewport.height * (window.devicePixelRatio || 1);
+                canvas.style.width = viewport.width + 'px';
+                canvas.style.height = viewport.height + 'px';
+                if (synctexData) canvas.style.cursor = 'crosshair';
+
+                const ctx = canvas.getContext('2d');
+                ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+                await page.render({canvasContext: ctx, viewport}).promise;
+
+                wrapper.appendChild(canvas);
+                pdfViewerContainer.appendChild(wrapper);
+
+                pdfPageCanvases.push({canvas, pageNum: i, viewport, wrapper});
+
+                const pageNum = i;
+                canvas.addEventListener('dblclick', (e) => inverseSyncTexClick(e, pageNum, viewport, wrapper));
+            }
+        }
+
+        // Ctrl+scroll wheel zoom
+        pdfViewerContainer.addEventListener('wheel', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const direction = e.deltaY < 0 ? 1 : -1;
+                pdfZoom(direction);
+            }
+        }, {passive: false});
+
+        function togglePdfDarkMode() {
+            pdfDarkMode = !pdfDarkMode;
+            const panel = document.getElementById('livePdfPanel');
+            panel.classList.toggle('pdf-dark-mode', pdfDarkMode);
+        }
+
+        function downloadCurrentPdf() {
+            if (!lastPdfBytes) return;
+            const blob = new Blob([lastPdfBytes], {type: 'application/pdf'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const title = currentProject ? currentProject.title : 'document';
+            a.download = title + '.pdf';
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         liveEditor.addEventListener('keydown', (e) => {
