@@ -1410,33 +1410,82 @@ pdfViewerContainer.addEventListener('wheel', (e) => {
     }
 }, {passive: false});
 
-// Click-and-drag panning
+// Click-and-drag panning with momentum
 (() => {
     let panning = false;
     let panStartX, panStartY, scrollStartX, scrollStartY;
+    let velocityX = 0, velocityY = 0;
+    let lastMoveX = 0, lastMoveY = 0, lastMoveTime = 0;
+    let momentumRAF = null;
+
+    function stopMomentum() {
+        if (momentumRAF) { cancelAnimationFrame(momentumRAF); momentumRAF = null; }
+        velocityX = 0;
+        velocityY = 0;
+    }
 
     pdfViewerContainer.addEventListener('mousedown', (e) => {
-        // Only left button, and not on interactive elements
         if (e.button !== 0) return;
+        stopMomentum();
         panning = true;
         panStartX = e.clientX;
         panStartY = e.clientY;
         scrollStartX = pdfViewerContainer.scrollLeft;
         scrollStartY = pdfViewerContainer.scrollTop;
+        lastMoveX = e.clientX;
+        lastMoveY = e.clientY;
+        lastMoveTime = performance.now();
         pdfViewerContainer.style.cursor = 'grabbing';
         e.preventDefault();
     });
 
     document.addEventListener('mousemove', (e) => {
         if (!panning) return;
+        const now = performance.now();
+        const dt = now - lastMoveTime;
+
         pdfViewerContainer.scrollLeft = scrollStartX - (e.clientX - panStartX);
         pdfViewerContainer.scrollTop = scrollStartY - (e.clientY - panStartY);
+
+        // Track velocity (pixels per ms), smoothed
+        if (dt > 0) {
+            const vx = (lastMoveX - e.clientX) / dt;
+            const vy = (lastMoveY - e.clientY) / dt;
+            // Exponential smoothing to avoid jitter
+            velocityX = 0.7 * velocityX + 0.3 * vx;
+            velocityY = 0.7 * velocityY + 0.3 * vy;
+        }
+        lastMoveX = e.clientX;
+        lastMoveY = e.clientY;
+        lastMoveTime = now;
     });
 
     document.addEventListener('mouseup', () => {
         if (!panning) return;
         panning = false;
         pdfViewerContainer.style.cursor = '';
+
+        // If mouse was stationary for a bit before release, no momentum
+        const dt = performance.now() - lastMoveTime;
+        if (dt > 80) { velocityX = 0; velocityY = 0; }
+
+        // Only start momentum if there's meaningful velocity
+        if (Math.abs(velocityX) < 0.05 && Math.abs(velocityY) < 0.05) return;
+
+        // Convert to px/frame at 60fps (velocity is px/ms)
+        let vx = velocityX * 16;
+        let vy = velocityY * 16;
+        const friction = 0.94;
+
+        function tick() {
+            vx *= friction;
+            vy *= friction;
+            if (Math.abs(vx) < 0.3 && Math.abs(vy) < 0.3) { momentumRAF = null; return; }
+            pdfViewerContainer.scrollLeft += vx;
+            pdfViewerContainer.scrollTop += vy;
+            momentumRAF = requestAnimationFrame(tick);
+        }
+        momentumRAF = requestAnimationFrame(tick);
     });
 })();
 
