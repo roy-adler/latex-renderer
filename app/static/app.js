@@ -1586,6 +1586,24 @@ function renderFileTree() {
     list.innerHTML = renderFolderNode(tree, '', 0, mainFile);
 }
 
+function expandFoldersToFile(fileId) {
+    const f = projectFiles.find(f => f.id === fileId);
+    if (!f) return;
+    const parts = f.filename.split('/');
+    if (parts.length <= 1) return; // top-level file, no folders to expand
+    // Expand each parent folder: "a", "a/b", "a/b/c" etc.
+    for (let i = 1; i < parts.length; i++) {
+        expandedFolders.add(parts.slice(0, i).join('/'));
+    }
+}
+
+function scrollFileTreeToActive() {
+    requestAnimationFrame(() => {
+        const active = document.querySelector('.file-tree-item.active');
+        if (active) active.scrollIntoView({block: 'nearest'});
+    });
+}
+
 async function openFile(fileId) {
     // Save current file to cache (skip binary files)
     const prevFile = activeFileId ? projectFiles.find(f => f.id === activeFileId) : null;
@@ -1611,7 +1629,9 @@ async function openFile(fileId) {
     }
 
     activeFileId = fileId;
+    expandFoldersToFile(fileId);
     renderFileTree();
+    scrollFileTreeToActive();
 
     // Get content from cache or fetch
     if (fileContentsCache[fileId] !== undefined) {
