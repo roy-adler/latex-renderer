@@ -1316,7 +1316,9 @@ function pdfPageNav(direction) {
     }
 }
 
-function pdfZoom(direction) {
+// mouseX/mouseY are optional — relative to the pdfViewerContainer.
+// When provided, zoom anchors to that point (the document under the cursor stays put).
+function pdfZoom(direction, mouseX, mouseY) {
     if (!pdfDoc || !pdfPageCanvases.length) return;
     const step = 0.1;
     const oldZoom = pdfUserZoom;
@@ -1325,10 +1327,11 @@ function pdfZoom(direction) {
 
     const ratio = pdfUserZoom / oldZoom;
 
-    // Record current page and offset within it
-    const currentPage = getCurrentVisiblePage();
-    const entry = pdfPageCanvases.find(p => p.pageNum === currentPage);
-    const offsetInPage = entry ? pdfViewerContainer.scrollTop - entry.wrapper.offsetTop : 0;
+    // Record the document point under the mouse (or center of viewport as fallback)
+    const anchorX = mouseX != null ? mouseX : pdfViewerContainer.clientWidth / 2;
+    const anchorY = mouseY != null ? mouseY : pdfViewerContainer.clientHeight / 2;
+    const docX = pdfViewerContainer.scrollLeft + anchorX;
+    const docY = pdfViewerContainer.scrollTop + anchorY;
 
     // Instantly resize all canvases via CSS (no re-render, no DOM rebuild)
     for (const pe of pdfPageCanvases) {
@@ -1342,11 +1345,10 @@ function pdfZoom(direction) {
 
     pdfScale = pdfBaseScale * pdfUserZoom;
 
-    // Restore scroll to same page + proportional offset
-    const newEntry = pdfPageCanvases.find(p => p.pageNum === currentPage);
-    if (newEntry) {
-        pdfViewerContainer.scrollTop = newEntry.wrapper.offsetTop + offsetInPage * ratio;
-    }
+    // After resize, the same document point is now at docX*ratio, docY*ratio.
+    // Scroll so it stays under the mouse cursor.
+    pdfViewerContainer.scrollLeft = docX * ratio - anchorX;
+    pdfViewerContainer.scrollTop = docY * ratio - anchorY;
 
     updateZoomInfo();
     updatePageInfo();
@@ -1396,12 +1398,15 @@ async function qualityReRender() {
     }
 }
 
-// Ctrl+scroll wheel zoom
+// Ctrl+scroll wheel zoom — anchored to mouse position
 pdfViewerContainer.addEventListener('wheel', (e) => {
     if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const direction = e.deltaY < 0 ? 1 : -1;
-        pdfZoom(direction);
+        const rect = pdfViewerContainer.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        pdfZoom(direction, mouseX, mouseY);
     }
 }, {passive: false});
 
