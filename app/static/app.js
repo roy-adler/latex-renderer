@@ -1356,35 +1356,43 @@ function pdfZoom(direction) {
     zoomRenderTimer = setTimeout(() => qualityReRender(), 350);
 }
 
-// Re-render canvases at current pdfScale for sharp text after zoom
+// Re-render canvases at current pdfScale for sharp text after zoom.
+// Renders to offscreen canvases first, then swaps them in to avoid black flash.
 async function qualityReRender() {
     if (!pdfDoc) return;
-    const currentPage = getCurrentVisiblePage();
-    const entry = pdfPageCanvases.find(p => p.pageNum === currentPage);
-    const offsetInPage = entry ? pdfViewerContainer.scrollTop - entry.wrapper.offsetTop : 0;
+    const targetScale = pdfScale; // snapshot — may change if user keeps zooming
 
     for (const pe of pdfPageCanvases) {
+        // Bail if zoom changed while we were rendering (user zoomed again)
+        if (pdfScale !== targetScale) return;
+
         const page = await pdfDoc.getPage(pe.pageNum);
-        const viewport = page.getViewport({scale: pdfScale});
+        const viewport = page.getViewport({scale: targetScale});
+        const dpr = window.devicePixelRatio || 1;
 
-        pe.canvas.width = viewport.width * (window.devicePixelRatio || 1);
-        pe.canvas.height = viewport.height * (window.devicePixelRatio || 1);
-        pe.canvas.style.width = viewport.width + 'px';
-        pe.canvas.style.height = viewport.height + 'px';
-        pe.wrapper.style.width = viewport.width + 'px';
-        pe.wrapper.style.height = viewport.height + 'px';
-
-        const ctx = pe.canvas.getContext('2d');
-        ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+        // Render to an offscreen canvas
+        const offscreen = document.createElement('canvas');
+        offscreen.width = viewport.width * dpr;
+        offscreen.height = viewport.height * dpr;
+        offscreen.style.width = viewport.width + 'px';
+        offscreen.style.height = viewport.height + 'px';
+        const ctx = offscreen.getContext('2d');
+        ctx.scale(dpr, dpr);
         await page.render({canvasContext: ctx, viewport}).promise;
 
-        pe.viewport = viewport;
-    }
+        // Bail if zoom changed during render
+        if (pdfScale !== targetScale) return;
 
-    // Restore scroll after quality re-render
-    const newEntry = pdfPageCanvases.find(p => p.pageNum === currentPage);
-    if (newEntry) {
-        pdfViewerContainer.scrollTop = newEntry.wrapper.offsetTop + offsetInPage;
+        // Swap: copy event listeners by replacing in-place
+        offscreen.style.cursor = pe.canvas.style.cursor;
+        const pageNum = pe.pageNum;
+        offscreen.addEventListener('dblclick', (e) => inverseSyncTexClick(e, pageNum, viewport, pe.wrapper));
+        pe.wrapper.replaceChild(offscreen, pe.canvas);
+        pe.canvas = offscreen;
+        pe.viewport = viewport;
+
+        pe.wrapper.style.width = viewport.width + 'px';
+        pe.wrapper.style.height = viewport.height + 'px';
     }
 }
 
