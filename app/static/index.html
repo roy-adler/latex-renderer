@@ -1047,6 +1047,8 @@ The quadratic formula is:
             lastPdfBytes = null;
             pdfUserZoom = 1.0;
             pdfBaseScale = null;
+            clearTimeout(zoomRenderTimer);
+            navScrolling = false;
             setLiveStatus('ready', 'Ready');
             lastSavedSource = liveEditor.value;
             startAutoSave();
@@ -1443,6 +1445,8 @@ The quadratic formula is:
         let pdfBaseScale = null;   // the "fit-to-width" scale, computed on render
         let pdfUserZoom = 1.0;     // user zoom multiplier (1.0 = 100% = fit-to-width)
         let lastPdfBytes = null;   // store last rendered PDF bytes for download
+        let zoomRenderTimer = null; // debounced quality re-render after zoom
+        let navScrolling = false;   // suppress page counter updates during smooth scroll
 
         function updateZoomInfo() {
             const pct = Math.round(pdfUserZoom * 100);
@@ -1450,6 +1454,7 @@ The quadratic formula is:
         }
 
         function updatePageInfo() {
+            if (navScrolling) return;
             if (!pdfDoc) {
                 document.getElementById('pdfPageInfo').textContent = '0 / 0';
                 return;
@@ -1478,66 +1483,86 @@ The quadratic formula is:
             if (!pdfDoc || !pdfPageCanvases.length) return;
             const current = getCurrentVisiblePage();
             const target = Math.max(1, Math.min(pdfDoc.numPages, current + direction));
+            if (target === current) return;
             const entry = pdfPageCanvases.find(p => p.pageNum === target);
             if (entry) {
+                // Show target page immediately, suppress scroll-based updates during animation
+                navScrolling = true;
+                document.getElementById('pdfPageInfo').textContent = target + ' / ' + pdfDoc.numPages;
                 pdfViewerContainer.scrollTo({top: entry.wrapper.offsetTop - 4, behavior: 'smooth'});
+                setTimeout(() => { navScrolling = false; }, 600);
             }
         }
 
-        async function pdfZoom(direction) {
-            if (!pdfDoc) return;
+        function pdfZoom(direction) {
+            if (!pdfDoc || !pdfPageCanvases.length) return;
             const step = 0.1;
             const oldZoom = pdfUserZoom;
             pdfUserZoom = Math.max(0.25, Math.min(5.0, pdfUserZoom + direction * step));
             if (oldZoom === pdfUserZoom) return;
 
-            // Preserve scroll ratio
-            const scrollRatio = pdfViewerContainer.scrollTop / (pdfViewerContainer.scrollHeight - pdfViewerContainer.clientHeight || 1);
+            const ratio = pdfUserZoom / oldZoom;
+
+            // Record current page and offset within it
+            const currentPage = getCurrentVisiblePage();
+            const entry = pdfPageCanvases.find(p => p.pageNum === currentPage);
+            const offsetInPage = entry ? pdfViewerContainer.scrollTop - entry.wrapper.offsetTop : 0;
+
+            // Instantly resize all canvases via CSS (no re-render, no DOM rebuild)
+            for (const pe of pdfPageCanvases) {
+                const w = parseFloat(pe.canvas.style.width) * ratio;
+                const h = parseFloat(pe.canvas.style.height) * ratio;
+                pe.wrapper.style.width = w + 'px';
+                pe.wrapper.style.height = h + 'px';
+                pe.canvas.style.width = w + 'px';
+                pe.canvas.style.height = h + 'px';
+            }
 
             pdfScale = pdfBaseScale * pdfUserZoom;
-            await reRenderPdfAtScale();
 
-            // Restore scroll
-            const newMax = pdfViewerContainer.scrollHeight - pdfViewerContainer.clientHeight;
-            pdfViewerContainer.scrollTop = scrollRatio * newMax;
+            // Restore scroll to same page + proportional offset
+            const newEntry = pdfPageCanvases.find(p => p.pageNum === currentPage);
+            if (newEntry) {
+                pdfViewerContainer.scrollTop = newEntry.wrapper.offsetTop + offsetInPage * ratio;
+            }
 
             updateZoomInfo();
             updatePageInfo();
+
+            // Debounced quality re-render at new resolution
+            clearTimeout(zoomRenderTimer);
+            zoomRenderTimer = setTimeout(() => qualityReRender(), 350);
         }
 
-        async function reRenderPdfAtScale() {
+        // Re-render canvases at current pdfScale for sharp text after zoom
+        async function qualityReRender() {
             if (!pdfDoc) return;
-            pdfViewerContainer.innerHTML = '';
-            pdfPageCanvases = [];
+            const currentPage = getCurrentVisiblePage();
+            const entry = pdfPageCanvases.find(p => p.pageNum === currentPage);
+            const offsetInPage = entry ? pdfViewerContainer.scrollTop - entry.wrapper.offsetTop : 0;
 
-            for (let i = 1; i <= pdfDoc.numPages; i++) {
-                const page = await pdfDoc.getPage(i);
+            for (const pe of pdfPageCanvases) {
+                const page = await pdfDoc.getPage(pe.pageNum);
                 const viewport = page.getViewport({scale: pdfScale});
 
-                const wrapper = document.createElement('div');
-                wrapper.className = 'pdf-page-wrapper';
-                wrapper.style.width = viewport.width + 'px';
-                wrapper.style.height = viewport.height + 'px';
-                wrapper.dataset.pageNum = i;
+                pe.canvas.width = viewport.width * (window.devicePixelRatio || 1);
+                pe.canvas.height = viewport.height * (window.devicePixelRatio || 1);
+                pe.canvas.style.width = viewport.width + 'px';
+                pe.canvas.style.height = viewport.height + 'px';
+                pe.wrapper.style.width = viewport.width + 'px';
+                pe.wrapper.style.height = viewport.height + 'px';
 
-                const canvas = document.createElement('canvas');
-                canvas.width = viewport.width * (window.devicePixelRatio || 1);
-                canvas.height = viewport.height * (window.devicePixelRatio || 1);
-                canvas.style.width = viewport.width + 'px';
-                canvas.style.height = viewport.height + 'px';
-                if (synctexData) canvas.style.cursor = 'crosshair';
-
-                const ctx = canvas.getContext('2d');
+                const ctx = pe.canvas.getContext('2d');
                 ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
                 await page.render({canvasContext: ctx, viewport}).promise;
 
-                wrapper.appendChild(canvas);
-                pdfViewerContainer.appendChild(wrapper);
+                pe.viewport = viewport;
+            }
 
-                pdfPageCanvases.push({canvas, pageNum: i, viewport, wrapper});
-
-                const pageNum = i;
-                canvas.addEventListener('dblclick', (e) => inverseSyncTexClick(e, pageNum, viewport, wrapper));
+            // Restore scroll after quality re-render
+            const newEntry = pdfPageCanvases.find(p => p.pageNum === currentPage);
+            if (newEntry) {
+                pdfViewerContainer.scrollTop = newEntry.wrapper.offsetTop + offsetInPage;
             }
         }
 
