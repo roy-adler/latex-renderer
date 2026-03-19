@@ -794,9 +794,12 @@ body {
 
 #pdfViewerContainer {
     flex: 1;
-    overflow-y: auto;
+    overflow: auto;
     background: #525659;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .pdf-page-wrapper {
