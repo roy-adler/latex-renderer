@@ -1,6 +1,6 @@
 """Rendering endpoints: project render, shared render, single-file render, cached render."""
 
-import base64, json, os, shutil, tempfile, pathlib
+import base64, json, os, shutil, tempfile, pathlib, time
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import JSONResponse
 from database import (
@@ -16,13 +16,16 @@ router = APIRouter(tags=["render"])
 
 def _render_project_files(files_meta: list[dict], main_file: str, workdir_prefix: str) -> JSONResponse:
     """Shared logic: write files to tmp, compile, return PDF+synctex JSON."""
+    t_start = time.monotonic()
     workdir = tempfile.mkdtemp(prefix=workdir_prefix)
     try:
         all_files = [get_project_file(f["id"]) for f in files_meta]
         write_project_files_to_workdir(all_files, workdir)
 
+        t_compile_start = time.monotonic()
         entry = detect_entrypoint(workdir, main_file)
         pdf_path, log = compile_latexmk(entry, 3)
+        t_compile_end = time.monotonic()
 
         if not pathlib.Path(pdf_path).exists():
             return JSONResponse(
@@ -33,7 +36,16 @@ def _render_project_files(files_meta: list[dict], main_file: str, workdir_prefix
             pdf_content = f.read()
         synctex_data = parse_synctex(entry, workdir)
         pdf_b64 = base64.b64encode(pdf_content).decode('ascii')
-        return JSONResponse(content={"pdf_base64": pdf_b64, "synctex": synctex_data})
+        t_end = time.monotonic()
+        return JSONResponse(content={
+            "pdf_base64": pdf_b64,
+            "synctex": synctex_data,
+            "timing": {
+                "total": round(t_end - t_start, 2),
+                "compile": round(t_compile_end - t_compile_start, 2),
+                "postprocess": round(t_end - t_compile_end, 2),
+            },
+        })
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
@@ -111,12 +123,15 @@ async def render_source(
     runs: int = Form(3),
 ):
     """Compile raw LaTeX source text and return PDF + synctex (used by Live Mode)."""
+    t_start = time.monotonic()
     workdir = tempfile.mkdtemp(prefix="latexapi_live_")
     entry = os.path.join(workdir, filename)
     try:
         with open(entry, "w", encoding="utf-8") as f:
             f.write(source)
+        t_compile_start = time.monotonic()
         pdf_path, log = compile_latexmk(entry, runs)
+        t_compile_end = time.monotonic()
         if not pathlib.Path(pdf_path).exists():
             return JSONResponse(
                 status_code=422,
@@ -126,6 +141,15 @@ async def render_source(
             pdf_content = f.read()
         synctex_data = parse_synctex(entry, workdir)
         pdf_b64 = base64.b64encode(pdf_content).decode('ascii')
-        return JSONResponse(content={"pdf_base64": pdf_b64, "synctex": synctex_data})
+        t_end = time.monotonic()
+        return JSONResponse(content={
+            "pdf_base64": pdf_b64,
+            "synctex": synctex_data,
+            "timing": {
+                "total": round(t_end - t_start, 2),
+                "compile": round(t_compile_end - t_compile_start, 2),
+                "postprocess": round(t_end - t_compile_end, 2),
+            },
+        })
     finally:
         shutil.rmtree(workdir, ignore_errors=True)

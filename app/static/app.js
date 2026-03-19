@@ -905,27 +905,70 @@ async function saveProject() {
 /* ── Render progress bar (right panel) ── */
 let renderProgressTimer = null;
 let renderProgressStart = 0;
-const RENDER_ESTIMATE_SEC = 12;
+let renderEstimateSec = 12; // default, updated from past timing data
+
+// Stages with fractional positions based on typical compile vs postprocess ratio
+// These get adjusted dynamically when we have real timing data
+let renderStageBreakpoints = {
+    compilePct: 65,  // % of time spent in compilation (default guess)
+};
+
 const RENDER_STAGES = [
     {pct: 0,  label: 'Saving files...'},
-    {pct: 10, label: 'Compiling LaTeX...'},
-    {pct: 85, label: 'Generating PDF...'},
+    {pct: 8,  label: 'Compiling LaTeX...'},
+    {pct: 70, label: 'Processing SyncTeX & encoding...'},
     {pct: 95, label: 'Transferring...'},
 ];
 
+function getRenderTimingKey() {
+    if (currentProject) return 'render_timing_' + currentProject.id;
+    if (currentShareLink) return 'render_timing_shared_' + currentShareLink.id;
+    return 'render_timing_live';
+}
+
+function loadRenderEstimate() {
+    try {
+        const saved = localStorage.getItem(getRenderTimingKey());
+        if (saved) {
+            const timing = JSON.parse(saved);
+            // Use the last total time, with a small buffer
+            renderEstimateSec = Math.max(5, timing.total * 1.1);
+            // Adjust stage breakpoints based on compile vs postprocess ratio
+            if (timing.compile && timing.total) {
+                const compileFrac = timing.compile / timing.total;
+                RENDER_STAGES[2].pct = Math.round(8 + compileFrac * 87); // compile ends here
+            }
+        } else {
+            renderEstimateSec = 12; // default for first compile
+            RENDER_STAGES[2].pct = 70;
+        }
+    } catch (e) {
+        renderEstimateSec = 12;
+    }
+}
+
+function saveRenderTiming(timing) {
+    if (!timing) return;
+    try {
+        localStorage.setItem(getRenderTimingKey(), JSON.stringify(timing));
+    } catch (e) { /* ignore */ }
+}
+
 function showRenderProgress() {
+    loadRenderEstimate();
     renderProgressStart = Date.now();
     const el = document.getElementById('pdfRenderProgress');
     el.style.display = '';
     document.getElementById('pdfRenderProgressFill').style.width = '0%';
     document.getElementById('pdfRenderStage').textContent = RENDER_STAGES[0].label;
-    document.getElementById('pdfRenderTime').textContent = `~${RENDER_ESTIMATE_SEC}s`;
+    document.getElementById('pdfRenderTime').textContent = `~${Math.round(renderEstimateSec)}s`;
     renderProgressTimer = setInterval(tickRenderProgress, 300);
 }
 
 function tickRenderProgress() {
     const elapsed = (Date.now() - renderProgressStart) / 1000;
-    const ratio = Math.min(elapsed / RENDER_ESTIMATE_SEC, 1);
+    const ratio = Math.min(elapsed / renderEstimateSec, 1);
+    // Ease-out curve that slows down as it approaches 95%
     const pct = Math.min(95, Math.round(ratio * 100 * (1 - 0.3 * ratio)));
 
     document.getElementById('pdfRenderProgressFill').style.width = pct + '%';
@@ -937,7 +980,7 @@ function tickRenderProgress() {
     }
     document.getElementById('pdfRenderStage').textContent = stage;
 
-    const remaining = Math.max(0, Math.round(RENDER_ESTIMATE_SEC - elapsed));
+    const remaining = Math.max(0, Math.round(renderEstimateSec - elapsed));
     document.getElementById('pdfRenderTime').textContent = remaining > 0 ? `~${remaining}s` : 'almost done...';
 }
 
@@ -996,6 +1039,9 @@ async function liveRender() {
         if (response.ok) {
             const data = await response.json();
             if (data.pdf_base64) {
+                // Save server timing for future estimates
+                if (data.timing) saveRenderTiming(data.timing);
+
                 const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
                 synctexData = data.synctex || null;
 
