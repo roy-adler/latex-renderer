@@ -1544,7 +1544,7 @@ function downloadCurrentPdf() {
     const title = currentProject ? currentProject.title : 'document';
     a.download = title + '.pdf';
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // Ctrl+Enter for forward search, debounced auto-render on change
@@ -2000,7 +2000,7 @@ async function downloadProjectZip() {
             a.href = url;
             a.download = (currentProject.title || 'project') + '.zip';
             a.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
     } catch(e) { /* ignore */ }
 }
@@ -2018,7 +2018,7 @@ async function downloadProjectZipById(projectId, title) {
             a.href = url;
             a.download = (title || 'project') + '.zip';
             a.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
     } catch(e) { /* ignore */ }
 }
