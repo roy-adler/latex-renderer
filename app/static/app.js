@@ -1204,7 +1204,7 @@ async function renderPdfPages(pdfBytes) {
     // Update toolbar info
     updateZoomInfo();
     updatePageInfo();
-    lastContainerWidth = pdfViewerContainer.clientWidth;
+    lastContainerWidth = pdfViewerContainer.clientWidth - 24;
 }
 
 /* ── Inverse Search: PDF click → Editor (server-side synctex) ── */
@@ -1439,21 +1439,39 @@ async function qualityReRender() {
     }
 }
 
-// Re-render PDF when container resizes (e.g. browser zoom change, window resize)
-let resizeRenderTimer = null;
+// Rescale PDF when container resizes (e.g. browser zoom change, window resize)
 let lastContainerWidth = 0;
-new ResizeObserver((entries) => {
-    const newWidth = entries[0].contentRect.width;
-    if (!newWidth || Math.abs(newWidth - lastContainerWidth) < 1) return;
-    if (!pdfDoc || !lastPdfBytes || !pdfPageCanvases.length) return;
-    clearTimeout(resizeRenderTimer);
-    resizeRenderTimer = setTimeout(() => {
-        if (!pdfDoc || !lastPdfBytes) return;
-        const currentWidth = pdfViewerContainer.clientWidth;
-        if (Math.abs(currentWidth - lastContainerWidth) < 1) return;
-        lastContainerWidth = currentWidth;
-        renderPdfPages(lastPdfBytes);
-    }, 300);
+new ResizeObserver(() => {
+    if (!pdfDoc || !pdfPageCanvases.length || !pdfBaseScale) return;
+    const newContainerWidth = pdfViewerContainer.clientWidth - 24;
+    if (newContainerWidth < 10 || Math.abs(newContainerWidth - lastContainerWidth) < 1) return;
+    lastContainerWidth = newContainerWidth;
+
+    // Recalculate base scale for new container width
+    const firstEntry = pdfPageCanvases[0];
+    const unscaledWidth = firstEntry.viewport.width / pdfScale;
+    const newBaseScale = newContainerWidth / unscaledWidth;
+    const oldScale = pdfScale;
+    pdfBaseScale = Math.max(0.3, Math.min(5, newBaseScale));
+    pdfScale = pdfBaseScale * pdfUserZoom;
+    const ratio = pdfScale / oldScale;
+    if (Math.abs(ratio - 1) < 0.001) return;
+
+    // Instantly rescale all canvases via CSS (same approach as pdfZoom)
+    for (const pe of pdfPageCanvases) {
+        const w = parseFloat(pe.canvas.style.width) * ratio;
+        const h = parseFloat(pe.canvas.style.height) * ratio;
+        pe.wrapper.style.width = w + 'px';
+        pe.wrapper.style.height = h + 'px';
+        pe.canvas.style.width = w + 'px';
+        pe.canvas.style.height = h + 'px';
+    }
+    updateZoomInfo();
+    updatePageInfo();
+
+    // Debounced sharp re-render
+    clearTimeout(zoomRenderTimer);
+    zoomRenderTimer = setTimeout(() => qualityReRender(), 350);
 }).observe(pdfViewerContainer);
 
 // Ctrl+scroll wheel zoom — anchored to mouse position
