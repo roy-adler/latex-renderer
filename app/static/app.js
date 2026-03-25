@@ -1148,7 +1148,7 @@ async function renderPdfPages(pdfBytes) {
     const hadContent = pdfPageCanvases.length > 0;
 
     // Load PDF
-    const loadingTask = pdfjsLib.getDocument({data: pdfBytes});
+    const loadingTask = pdfjsLib.getDocument({data: pdfBytes.slice()});
     pdfDoc = await loadingTask.promise;
 
     // Compute base scale to fit container width (= 100% zoom)
@@ -1204,6 +1204,7 @@ async function renderPdfPages(pdfBytes) {
     // Update toolbar info
     updateZoomInfo();
     updatePageInfo();
+    lastContainerWidth = pdfViewerContainer.clientWidth;
 }
 
 /* ── Inverse Search: PDF click → Editor (server-side synctex) ── */
@@ -1437,6 +1438,23 @@ async function qualityReRender() {
         pe.wrapper.style.height = viewport.height + 'px';
     }
 }
+
+// Re-render PDF when container resizes (e.g. browser zoom change, window resize)
+let resizeRenderTimer = null;
+let lastContainerWidth = 0;
+new ResizeObserver((entries) => {
+    const newWidth = entries[0].contentRect.width;
+    if (!newWidth || Math.abs(newWidth - lastContainerWidth) < 1) return;
+    if (!pdfDoc || !lastPdfBytes || !pdfPageCanvases.length) return;
+    clearTimeout(resizeRenderTimer);
+    resizeRenderTimer = setTimeout(() => {
+        if (!pdfDoc || !lastPdfBytes) return;
+        const currentWidth = pdfViewerContainer.clientWidth;
+        if (Math.abs(currentWidth - lastContainerWidth) < 1) return;
+        lastContainerWidth = currentWidth;
+        renderPdfPages(lastPdfBytes);
+    }, 300);
+}).observe(pdfViewerContainer);
 
 // Ctrl+scroll wheel zoom — anchored to mouse position
 pdfViewerContainer.addEventListener('wheel', (e) => {
