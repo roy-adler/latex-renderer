@@ -1176,14 +1176,17 @@ async function renderPdfPages(pdfBytes) {
         wrapper.dataset.pageNum = i;
 
         const canvas = document.createElement('canvas');
-        canvas.width = viewport.width * (window.devicePixelRatio || 1);
-        canvas.height = viewport.height * (window.devicePixelRatio || 1);
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.floor(viewport.width * dpr));
+        canvas.height = Math.max(1, Math.floor(viewport.height * dpr));
         canvas.style.width = viewport.width + 'px';
         canvas.style.height = viewport.height + 'px';
         if (synctexToken) canvas.style.cursor = 'crosshair';
 
-        const ctx = canvas.getContext('2d');
-        ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+        const ctx = canvas.getContext('2d', {alpha: false});
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, viewport.width, viewport.height);
         await page.render({canvasContext: ctx, viewport}).promise;
 
         wrapper.appendChild(canvas);
@@ -1205,6 +1208,7 @@ async function renderPdfPages(pdfBytes) {
     updateZoomInfo();
     updatePageInfo();
     lastContainerWidth = pdfViewerContainer.clientWidth - 24;
+    lastPdfDevicePixelRatio = window.devicePixelRatio || 1;
 }
 
 /* ── Inverse Search: PDF click → Editor (server-side synctex) ── */
@@ -1376,8 +1380,8 @@ function pdfZoom(direction, mouseX, mouseY) {
 
     // Instantly resize all canvases via CSS (no re-render, no DOM rebuild)
     for (const pe of pdfPageCanvases) {
-        const w = parseFloat(pe.canvas.style.width) * ratio;
-        const h = parseFloat(pe.canvas.style.height) * ratio;
+        const w = pdfCssPx(parseFloat(pe.canvas.style.width) * ratio);
+        const h = pdfCssPx(parseFloat(pe.canvas.style.height) * ratio);
         pe.wrapper.style.width = w + 'px';
         pe.wrapper.style.height = h + 'px';
         pe.canvas.style.width = w + 'px';
@@ -1415,12 +1419,14 @@ async function qualityReRender() {
 
         // Render to an offscreen canvas
         const offscreen = document.createElement('canvas');
-        offscreen.width = viewport.width * dpr;
-        offscreen.height = viewport.height * dpr;
+        offscreen.width = Math.max(1, Math.floor(viewport.width * dpr));
+        offscreen.height = Math.max(1, Math.floor(viewport.height * dpr));
         offscreen.style.width = viewport.width + 'px';
         offscreen.style.height = viewport.height + 'px';
-        const ctx = offscreen.getContext('2d');
+        const ctx = offscreen.getContext('2d', {alpha: false});
         ctx.scale(dpr, dpr);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, viewport.width, viewport.height);
         await page.render({canvasContext: ctx, viewport}).promise;
 
         // Bail if zoom changed during render
@@ -1439,40 +1445,70 @@ async function qualityReRender() {
     }
 }
 
-// Rescale PDF when container resizes (e.g. browser zoom change, window resize)
+// Rescale PDF when container resizes or browser zoom changes (DPR / visual viewport).
+// Browser zoom often changes devicePixelRatio with almost no change in clientWidth, so the old
+// ResizeObserver-only guard skipped updates and left a stale bitmap CSS-scaled — gray #pdfViewerContainer showed through.
 let lastContainerWidth = 0;
-new ResizeObserver(() => {
+let lastPdfDevicePixelRatio = window.devicePixelRatio || 1;
+let pdfLayoutDebounceTimer = null;
+
+function pdfCssPx(n) {
+    return Math.round(n * 100) / 100;
+}
+
+function applyPdfContainerResize() {
     if (!pdfDoc || !pdfPageCanvases.length || !pdfBaseScale) return;
     const newContainerWidth = pdfViewerContainer.clientWidth - 24;
-    if (newContainerWidth < 10 || Math.abs(newContainerWidth - lastContainerWidth) < 1) return;
-    lastContainerWidth = newContainerWidth;
+    if (newContainerWidth < 10) return;
 
-    // Recalculate base scale for new container width
-    const firstEntry = pdfPageCanvases[0];
-    const unscaledWidth = firstEntry.viewport.width / pdfScale;
-    const newBaseScale = newContainerWidth / unscaledWidth;
-    const oldScale = pdfScale;
-    pdfBaseScale = Math.max(0.3, Math.min(5, newBaseScale));
-    pdfScale = pdfBaseScale * pdfUserZoom;
-    const ratio = pdfScale / oldScale;
-    if (Math.abs(ratio - 1) < 0.001) return;
+    const dpr = window.devicePixelRatio || 1;
+    const widthDelta = Math.abs(newContainerWidth - lastContainerWidth);
+    const dprDelta = Math.abs(dpr - lastPdfDevicePixelRatio);
 
-    // Instantly rescale all canvases via CSS (same approach as pdfZoom)
-    for (const pe of pdfPageCanvases) {
-        const w = parseFloat(pe.canvas.style.width) * ratio;
-        const h = parseFloat(pe.canvas.style.height) * ratio;
-        pe.wrapper.style.width = w + 'px';
-        pe.wrapper.style.height = h + 'px';
-        pe.canvas.style.width = w + 'px';
-        pe.canvas.style.height = h + 'px';
+    if (widthDelta < 1 && dprDelta < 0.001) return;
+
+    lastPdfDevicePixelRatio = dpr;
+
+    if (widthDelta >= 1) {
+        lastContainerWidth = newContainerWidth;
+
+        const firstEntry = pdfPageCanvases[0];
+        const unscaledWidth = firstEntry.viewport.width / pdfScale;
+        const newBaseScale = newContainerWidth / unscaledWidth;
+        const oldScale = pdfScale;
+        pdfBaseScale = Math.max(0.3, Math.min(5, newBaseScale));
+        pdfScale = pdfBaseScale * pdfUserZoom;
+        const ratio = pdfScale / oldScale;
+
+        if (Math.abs(ratio - 1) >= 0.001) {
+            for (const pe of pdfPageCanvases) {
+                const w = pdfCssPx(parseFloat(pe.canvas.style.width) * ratio);
+                const h = pdfCssPx(parseFloat(pe.canvas.style.height) * ratio);
+                pe.wrapper.style.width = w + 'px';
+                pe.wrapper.style.height = h + 'px';
+                pe.canvas.style.width = w + 'px';
+                pe.canvas.style.height = h + 'px';
+            }
+            updateZoomInfo();
+            updatePageInfo();
+        }
     }
-    updateZoomInfo();
-    updatePageInfo();
 
-    // Debounced sharp re-render
     clearTimeout(zoomRenderTimer);
-    zoomRenderTimer = setTimeout(() => qualityReRender(), 350);
-}).observe(pdfViewerContainer);
+    const delay = widthDelta >= 1 ? 350 : 80;
+    zoomRenderTimer = setTimeout(() => qualityReRender(), delay);
+}
+
+function schedulePdfLayoutSync() {
+    clearTimeout(pdfLayoutDebounceTimer);
+    pdfLayoutDebounceTimer = setTimeout(() => applyPdfContainerResize(), 32);
+}
+
+new ResizeObserver(() => schedulePdfLayoutSync()).observe(pdfViewerContainer);
+window.addEventListener('resize', schedulePdfLayoutSync);
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', schedulePdfLayoutSync);
+}
 
 // Ctrl+scroll wheel zoom — anchored to mouse position
 pdfViewerContainer.addEventListener('wheel', (e) => {

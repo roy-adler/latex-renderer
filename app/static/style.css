@@ -863,10 +863,15 @@ body {
     margin: 8px auto;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     line-height: 0;
+    /* Match typical PDF page; avoids gray #525659 from #pdfViewerContainer showing through gaps */
+    background: #fff;
+    overflow: hidden;
 }
 
 .pdf-page-wrapper canvas {
     display: block;
+    vertical-align: top;
+    background: #fff;
 }
 
 .synctex-highlight {
